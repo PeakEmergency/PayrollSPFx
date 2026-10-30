@@ -12,7 +12,6 @@ Design: `docs/superpowers/specs/2026-10-30-timesheet-webpart-design.md`.
 ## Prerequisites
 
 - SPFx 1.24.0. Node.js 22 LTS (`>=22.14.0 <23`), see the [SPFx compatibility table](https://learn.microsoft.com/sharepoint/dev/spfx/compatibility).
-- [PnP.PowerShell](https://pnp.github.io/powershell/) 2.x or later, for provisioning. PnP 2+ needs an Entra app registration for interactive login; pass its id with `-ClientId`.
 - A SharePoint tenant app catalog, and a tenant admin to approve the Graph permissions.
 
 Keep the repo out of OneDrive sync if you can: OneDrive locks files in `node_modules`, `jest-output` and `lib*`, which makes `npm install` very slow and can make builds fail with `EPERM`.
@@ -35,15 +34,9 @@ The package is `sharepoint/solution/peak-timesheets.sppkg`.
 
 1. Upload the `.sppkg` to the tenant app catalog and deploy it.
 2. Approve the API access: SharePoint admin center → **Advanced** → **API access**. Approve `Microsoft Graph` · `Mail.Send` and `Microsoft Graph` · `User.Read`.
-3. Provision the list and the template library on the site that will host the web part:
-
-   ```powershell
-   pwsh provisioning/Provision-Timesheets.ps1 -SiteUrl https://<tenant>.sharepoint.com/sites/<site> -AccountsGroup '<Accounts group name>' -ClientId <app id>
-   ```
-
-   The script can be rerun safely. It creates:
-   - `Timesheet Submissions`, with attachments on and item-level security (users read and edit only their own items). The site Members group gets **Contribute** on this list, not Edit, because Edit includes *Manage Lists*, which bypasses item-level security. The accounts group gets **Edit**, so it sees all items.
-   - `Timesheet Templates`, holding the three `.xlsx` files from `Templates/xlsx`.
+3. Provision the list and the template library on the site that hosts the web part. Open any page of that site as a site owner, press F12, and paste `provisioning/provision-timesheets.js` into the console (set `ACCOUNTS_GROUP` at the top first). It uses SharePoint REST with your browser login, and is safe to rerun. It creates:
+   - `Timesheet Submissions`, with attachments on and item-level security (users read and edit only their own items). The site Members group gets **Contribute** on this list, not Edit, because Edit includes *Manage Lists*, which bypasses item-level security. The accounts group (a SharePoint group) gets **Edit**, so it sees all items. People who submit timesheets must be site Members.
+   - `Timesheet Templates`. Upload the three `.xlsx` files from `Templates/xlsx` into it. The script prints the library URL; put it in the web part's template library property if it is not `<site>/Timesheet Templates`.
 4. Add the app to the site, then add the **Timesheet** web part to a page. Its properties are the recipient email, the list title and the template library URL (leave this blank for `<site>/Timesheet Templates`).
 
 ## Updating a template
