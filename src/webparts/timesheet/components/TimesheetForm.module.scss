@@ -1,0 +1,140 @@
+// Colours and fonts taken from the template workbooks (xl/styles.xml).
+$red: #ff0000;
+$totalsRed: #ee0000;
+$groupFill: #dfe6f5;
+$headerFill: #f2f2f2;
+$border: #aeaaaa;
+$grey: #a6a6a6;
+
+.form {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #000;
+
+  button {
+    font-family: inherit;
+    font-weight: bold;
+    padding: 6px 16px;
+    margin-right: 8px;
+    border: 1px solid $border;
+    background: $headerFill;
+    cursor: pointer;
+  }
+}
+
+.picker {
+  margin-bottom: 12px;
+
+  .active {
+    background: $groupFill;
+    border-color: #000;
+  }
+}
+
+.confirm {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #fff4ce;
+  border: 1px solid #c19c00;
+
+  button {
+    margin-left: 8px;
+  }
+}
+
+.header {
+  margin-bottom: 8px;
+}
+
+.title {
+  color: $red;
+  font-size: 28pt;
+  font-weight: bold;
+}
+
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.name {
+  font-size: 24pt;
+  font-weight: bold;
+  min-height: 1.2em;
+}
+
+.period {
+  label {
+    font-size: 11pt;
+    font-weight: bold;
+    margin-right: 12px;
+  }
+
+  input {
+    font-family: inherit;
+    font-size: 12pt;
+    font-weight: bold;
+    color: $grey;
+  }
+}
+
+.periodLabel {
+  color: $red;
+  font-size: 16pt;
+  font-weight: bold;
+}
+
+.grid {
+  overflow-x: auto;
+
+  // Column headers styled like the template's row 7.
+  :global(.jss_worksheet thead td) {
+    background: $headerFill;
+    font-weight: bold;
+    font-size: 10pt;
+    white-space: normal;
+  }
+
+  :global(.jss_worksheet td) {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10pt;
+    border-color: $border;
+  }
+
+  :global(.jss_worksheet td.readonly) {
+    background: $headerFill;
+    color: #000;
+  }
+}
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 8px;
+  margin: 8px 0;
+  background: $headerFill;
+  color: $totalsRed;
+  font-weight: bold;
+}
+
+.totalsLabel {
+  font-size: 12pt;
+}
+
+.submit {
+  background: $groupFill !important;
+}
+
+.errors {
+  color: #a4262c;
+  margin: 8px 0;
+}
+
+.sent {
+  color: #107c10;
+  font-weight: bold;
+  margin: 8px 0;
+}

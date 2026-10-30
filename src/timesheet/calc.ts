@@ -1,7 +1,7 @@
 /* eslint-disable @rushstack/no-new-null -- null marks a blank computed cell, as in the template */
 import { TEMPLATES } from './definitions';
 import { Line, TimesheetType } from './types';
-import { timeToDayFraction } from './values';
+import { parseTime, timeToDayFraction } from './values';
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
@@ -9,10 +9,12 @@ const num = (v: Line[string]): number => (typeof v === 'number' ? v : 0);
 
 const has = (v: Line[string]): boolean => v !== null && v !== undefined && v !== '';
 
-/** Hours between two 'HH:MM' times; wraps past midnight when asked (Medic). */
+/** Hours between two times as typed; null unless both parse. Wraps past midnight when asked (Medic). */
 function hoursBetween(start: Line[string], end: Line[string], wrap: boolean): number | null {
-  if (typeof start !== 'string' || typeof end !== 'string' || !start || !end) return null;
-  let diff = timeToDayFraction(end) - timeToDayFraction(start);
+  const s = parseTime(String(start ?? ''));
+  const e = parseTime(String(end ?? ''));
+  if (!s || !e) return null;
+  let diff = timeToDayFraction(e) - timeToDayFraction(s);
   if (wrap) diff = ((diff % 1) + 1) % 1;
   return diff * 24;
 }

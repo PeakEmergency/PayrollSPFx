@@ -31,3 +31,8 @@ it('empty row computes to null', () => {
 it('computeTotals', () => {
   expect(computeTotals('Medic', [medic, {}])).toEqual({ hours: 12, travel: 100, perDiem: 47, amount: 597 });
 });
+
+it('raw or invalid times', () => {
+  expect(computeLine('Medic', { ...medic, start: '1900', end: '7:00 am' }).hours).toBe(12);
+  expect(computeLine('Medic', { ...medic, start: 'abc' }).hours).toBeNull();
+});

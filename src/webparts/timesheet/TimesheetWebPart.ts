@@ -1,96 +1,51 @@
 import * as React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Version } from '@microsoft/sp-core-library';
-import {
-  type IPropertyPaneConfiguration,
-  PropertyPaneTextField
-} from '@microsoft/sp-property-pane';
+import { type IPropertyPaneConfiguration, PropertyPaneTextField } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
-import { IReadonlyTheme } from '@microsoft/sp-component-base';
+import { MSGraphClientV3 } from '@microsoft/sp-http';
 
 import * as strings from 'TimesheetWebPartStrings';
-import Timesheet from './components/Timesheet';
-import { ITimesheetProps } from './components/ITimesheetProps';
+import TimesheetForm, { ITimesheetFormProps } from './components/TimesheetForm';
+import { getCurrentEmployee, GraphMailer } from '../../services/graph';
+import { SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
+import { submitTimesheet } from '../../services/submit';
 
 export interface ITimesheetWebPartProps {
-  description: string;
+  emailTo: string;
+  listTitle: string;
+  templateLibraryUrl: string;
 }
 
 export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWebPartProps> {
-
-  private _isDarkTheme: boolean = false;
-  private _environmentMessage: string = '';
   private _root: Root | undefined;
+  private _graph: Promise<MSGraphClientV3> | undefined;
+
+  private get graph(): Promise<MSGraphClientV3> {
+    this._graph = this._graph || this.context.msGraphClientFactory.getClient('3');
+    return this._graph;
+  }
 
   public render(): void {
-    const element: React.ReactElement<ITimesheetProps> = React.createElement(
-      Timesheet,
-      {
-        description: this.properties.description,
-        isDarkTheme: this._isDarkTheme,
-        environmentMessage: this._environmentMessage,
-        userDisplayName: this.context.pageContext.user.displayName
-      }
-    );
+    const web = this.context.pageContext.web;
+    const { emailTo, listTitle } = this.properties;
+    const templateLibraryUrl = this.properties.templateLibraryUrl || `${web.serverRelativeUrl.replace(/\/$/, '')}/Timesheet Templates`;
 
-    if (!this._root) {
-      this._root = createRoot(this.domElement);
-    }
+    const props: ITimesheetFormProps = {
+      emailTo,
+      getName: async () => getCurrentEmployee(await this.graph),
+      submit: async (data) =>
+        submitTimesheet(data, {
+          store: new SpSubmissionStore(this.context.spHttpClient, web.absoluteUrl, listTitle),
+          templates: new SpTemplateSource(this.context.spHttpClient, web.absoluteUrl, templateLibraryUrl),
+          mailer: new GraphMailer(await this.graph),
+          emailTo,
+          employeeId: this.context.pageContext.legacyPageContext.userId
+        })
+    };
 
-    this._root.render(element);
-  }
-
-  protected onInit(): Promise<void> {
-    return this._getEnvironmentMessage().then(message => {
-      this._environmentMessage = message;
-    });
-  }
-
-
-
-  private _getEnvironmentMessage(): Promise<string> {
-    if (!!this.context.sdks.microsoftTeams) { // running in Teams, office.com or Outlook
-      return this.context.sdks.microsoftTeams.teamsJs.app.getContext()
-        .then(context => {
-          let environmentMessage: string = '';
-          switch (context.app.host.name) {
-            case 'Office': // running in Office
-              environmentMessage = this.context.isServedFromLocalhost ? strings.AppLocalEnvironmentOffice : strings.AppOfficeEnvironment;
-              break;
-            case 'Outlook': // running in Outlook
-              environmentMessage = this.context.isServedFromLocalhost ? strings.AppLocalEnvironmentOutlook : strings.AppOutlookEnvironment;
-              break;
-            case 'Teams': // running in Teams
-            case 'TeamsModern':
-              environmentMessage = this.context.isServedFromLocalhost ? strings.AppLocalEnvironmentTeams : strings.AppTeamsTabEnvironment;
-              break;
-            default:
-              environmentMessage = strings.UnknownEnvironment;
-          }
-
-          return environmentMessage;
-        });
-    }
-
-    return Promise.resolve(this.context.isServedFromLocalhost ? strings.AppLocalEnvironmentSharePoint : strings.AppSharePointEnvironment);
-  }
-
-  protected onThemeChanged(currentTheme: IReadonlyTheme | undefined): void {
-    if (!currentTheme) {
-      return;
-    }
-
-    this._isDarkTheme = !!currentTheme.isInverted;
-    const {
-      semanticColors
-    } = currentTheme;
-
-    if (semanticColors) {
-      this.domElement.style.setProperty('--bodyText', semanticColors.bodyText || null);
-      this.domElement.style.setProperty('--link', semanticColors.link || null);
-      this.domElement.style.setProperty('--linkHovered', semanticColors.linkHovered || null);
-    }
-
+    this._root = this._root || createRoot(this.domElement);
+    this._root.render(React.createElement(TimesheetForm, props));
   }
 
   protected onDispose(): void {
@@ -106,15 +61,16 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
     return {
       pages: [
         {
-          header: {
-            description: strings.PropertyPaneDescription
-          },
+          header: { description: strings.PropertyPaneDescription },
           groups: [
             {
               groupName: strings.BasicGroupName,
               groupFields: [
-                PropertyPaneTextField('description', {
-                  label: strings.DescriptionFieldLabel
+                PropertyPaneTextField('emailTo', { label: strings.EmailToFieldLabel }),
+                PropertyPaneTextField('listTitle', { label: strings.ListTitleFieldLabel }),
+                PropertyPaneTextField('templateLibraryUrl', {
+                  label: strings.TemplateLibraryUrlFieldLabel,
+                  description: strings.TemplateLibraryUrlFieldDescription
                 })
               ]
             }
