@@ -72,6 +72,11 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       col('otherTotal', 'L', 'TOTAL', 'computed', 1.14),
       col('amount', 'M', 'AMOUNT', 'computed', 13.29)
     ],
+    groups: [
+      { title: 'INSTRUCTIONAL FEES', from: 'C', to: 'E', fill: '#dfe6f5' },
+      { title: 'ADMINISTRATIVE FEES', from: 'G', to: 'H', fill: '#e6f1df' },
+      { title: 'OTHER FEES', from: 'J', to: 'K', fill: '#fff6dd' }
+    ],
     totals: [
       { key: 'days', cell: 'D22' },
       { key: 'adminHours', cell: 'G22' },
@@ -113,6 +118,10 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       col('perDiem', 'J', 'PER DIEM', 'dropdown', 14.29, [47]),
       col('otherTotal', 'K', 'TOTAL', 'computed', 0.86),
       col('amount', 'L', 'AMOUNT', 'computed', 13.86)
+    ],
+    groups: [
+      { title: 'MEDIC FEES', from: 'C', to: 'G', fill: '#dfe6f5' },
+      { title: 'OTHER FEES', from: 'I', to: 'J', fill: '#fff6dd' }
     ],
     totals: [
       { key: 'hours', cell: 'F22' },

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import styles from './TimesheetForm.module.scss';
 import TimesheetGrid from './TimesheetGrid';
+import logo from '../assets/peak-logo.jpg';
 import { computeTotals } from '../../../timesheet/calc';
 import { TEMPLATES } from '../../../timesheet/definitions';
 import { Line, TimesheetData, TimesheetType } from '../../../timesheet/types';
@@ -105,16 +106,19 @@ export default function TimesheetForm({ emailTo, getName, submit }: ITimesheetFo
       {def && (
         <>
           <div className={styles.header}>
-            <div className={styles.title}>{def.title}</div>
+            <div className={styles.titleRow}>
+              <div className={styles.title}>{def.title}</div>
+              <img className={styles.logo} src={logo} alt="Peak Emergency" />
+            </div>
             <div className={styles.headerRow}>
               <div className={styles.name} aria-label="Name">{name}</div>
               <div className={styles.period}>
                 <div className={styles.periodLabel}>PAY PERIOD</div>
                 <label>
-                  From: <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                  From: <input type="date" className={from ? '' : styles.empty} value={from} onChange={(e) => setFrom(e.target.value)} />
                 </label>
                 <label>
-                  To: <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                  To: <input type="date" className={to ? '' : styles.empty} value={to} onChange={(e) => setTo(e.target.value)} />
                 </label>
               </div>
             </div>
@@ -134,7 +138,7 @@ export default function TimesheetForm({ emailTo, getName, submit }: ITimesheetFo
             ))}
           </div>
 
-          <button type="button" className={styles.submit} disabled={submitting} onClick={onSubmit}>
+          <button type="button" className={styles.submit} disabled={submitting || !from || !to} onClick={onSubmit}>
             {submitting ? 'Sending…' : 'Submit'}
           </button>
         </>

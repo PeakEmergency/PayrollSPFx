@@ -19,6 +19,14 @@ describe('definitions match the real templates', () => {
       const ws = wb.getWorksheet(def.sheetName);
       expect(ws).toBeDefined();
 
+      // Group headings sit on row 6: merged title over the group's columns, with its fill.
+      (def.groups || []).forEach((g) => {
+        const top = ws!.getCell(`${g.from}${def.headerRow - 1}`);
+        expect(collapse(String(top.master.value))).toBe(g.title);
+        expect(ws!.getCell(`${g.to}${def.headerRow - 1}`).master.address).toBe(top.master.address);
+        expect((top.fill as { fgColor?: { argb?: string } }).fgColor?.argb).toBe(`FF${g.fill.slice(1).toUpperCase()}`);
+      });
+
       def.columns.forEach((c) => {
         expect(collapse(String(ws!.getCell(`${c.col}${def.headerRow}`).value))).toBe(c.header);
         if (c.kind === 'computed') {
@@ -45,6 +53,11 @@ describe('definitions match the real templates', () => {
       t.columns.filter((c) => c.optionLabels).forEach((c) => expect(c.optionLabels!.length).toBe(c.options!.length))
     );
     expect(TEMPLATES.Instructor.columns.find((c) => c.key === 'dayRate')!.optionLabels).toBeDefined();
+  });
+
+  it('instructor and medic have group headings', () => {
+    expect(TEMPLATES.Instructor.groups!.map((g) => g.title)).toEqual(['INSTRUCTIONAL FEES', 'ADMINISTRATIVE FEES', 'OTHER FEES']);
+    expect(TEMPLATES.Medic.groups!.map((g) => g.title)).toEqual(['MEDIC FEES', 'OTHER FEES']);
   });
 
   it('medic day rates', () => {

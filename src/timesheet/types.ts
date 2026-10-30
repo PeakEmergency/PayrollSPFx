@@ -26,6 +26,8 @@ export interface TemplateDef {
   rowCount: number;
   headerRow: number;
   columns: ColumnDef[];
+  /** Group headings above the column headers (template row headerRow − 1). fill is '#rrggbb'. */
+  groups?: { title: string; from: string; to: string; fill: string }[];
   /** On-screen totals, same cells as the template totals row. */
   totals: { key: string; cell: string }[];
   grandTotalKey: string;
