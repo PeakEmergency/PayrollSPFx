@@ -118,6 +118,10 @@ $emptyFill: #fff2cc;
     white-space: normal;
   }
 
+  :global(.jss_worksheet tbody td) {
+    height: 37px; // template rows are 27.95pt
+  }
+
   :global(.jss_worksheet td) {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 10pt;

@@ -126,6 +126,7 @@ export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridPr
           columns: cols.map(toColumn),
           nestedHeaders: def.groups ? nestedHeaders(def, cols) : undefined,
           minDimensions: [cols.length, def.rowCount],
+          defaultRowHeight: 37, // template rows are 27.95pt
           allowInsertRow: false,
           allowManualInsertRow: false,
           allowDeleteRow: false,
