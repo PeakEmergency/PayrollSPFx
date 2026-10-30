@@ -1,77 +1,56 @@
 # peak-timesheets
 
-## Summary
+SharePoint Framework web part for Peak Emergency timesheets. The signed-in user picks Admin, Instructor or Medic, fills in a grid laid out like the Excel template, and submits. On submit the web part:
 
-Short summary on functionality and used technologies.
+1. records the submission in the `Timesheet Submissions` list (status `Pending`);
+2. fills a copy of the real template from the `Timesheet Templates` library and attaches it to the list item;
+3. emails the `.xlsx` from the user's own mailbox (Microsoft Graph `/me/sendMail`) to accounts (default `account@peakemergency.com`);
+4. sets the item to `Sent`, or to `Email failed` with the error text if anything after step 1 fails.
 
-[picture of the solution in action, if possible]
-
-## Used SharePoint Framework Version
-
-![version](https://img.shields.io/badge/version-1.24.0-green.svg)
-
-## Applies to
-
-- [SharePoint Framework](https://aka.ms/spfx)
-- [Microsoft 365 tenant](https://docs.microsoft.com/sharepoint/dev/spfx/set-up-your-developer-tenant)
-
-> Get your own free development tenant by subscribing to [Microsoft 365 developer program](http://aka.ms/o365devprogram)
+Design: `docs/superpowers/specs/2026-10-30-timesheet-webpart-design.md`.
 
 ## Prerequisites
 
-> Any special pre-requisites?
+- SPFx 1.24.0. Node.js 22 LTS (`>=22.14.0 <23`), see the [SPFx compatibility table](https://learn.microsoft.com/sharepoint/dev/spfx/compatibility).
+- [PnP.PowerShell](https://pnp.github.io/powershell/) 2.x or later, for provisioning. PnP 2+ needs an Entra app registration for interactive login; pass its id with `-ClientId`.
+- A SharePoint tenant app catalog, and a tenant admin to approve the Graph permissions.
 
-## Solution
+Keep the repo out of OneDrive sync if you can: OneDrive locks files in `node_modules`, `jest-output` and `lib*`, which makes `npm install` very slow and can make builds fail with `EPERM`.
 
-| Solution    | Author(s)                                               |
-| ----------- | ------------------------------------------------------- |
-| folder name | Author details (name, company, twitter alias with link) |
+## Develop
 
-## Version history
+```bash
+npm install
+npm test          # Heft build + Jest (unit tests for parsing, pay, validation, Excel fill, submission flow)
+npm run start     # serve for the hosted workbench: <site>/_layouts/15/workbench.aspx
+```
 
-| Version | Date             | Comments        |
-| ------- | ---------------- | --------------- |
-| 1.1     | March 10, 2021   | Update comment  |
-| 1.0     | January 29, 2021 | Initial release |
+## Package and deploy
 
-## Disclaimer
+```bash
+npm run build     # production build + package-solution
+```
 
-**THIS CODE IS PROVIDED _AS IS_ WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.**
+The package is `sharepoint/solution/peak-timesheets.sppkg`.
 
----
+1. Upload the `.sppkg` to the tenant app catalog and deploy it.
+2. Approve the API access: SharePoint admin center → **Advanced** → **API access**. Approve `Microsoft Graph` · `Mail.Send` and `Microsoft Graph` · `User.Read`.
+3. Provision the list and the template library on the site that will host the web part:
 
-## Minimal Path to Awesome
+   ```powershell
+   pwsh provisioning/Provision-Timesheets.ps1 -SiteUrl https://<tenant>.sharepoint.com/sites/<site> -AccountsGroup '<Accounts group name>' -ClientId <app id>
+   ```
 
-- Clone this repository
-- Ensure that you are at the solution folder
-- in the command-line run:
-  - `npm install -g @rushstack/heft`
-  - `npm install`
-  - `heft start`
+   The script can be rerun safely. It creates:
+   - `Timesheet Submissions`, with attachments on and item-level security (users read and edit only their own items). The site Members group gets **Contribute** on this list, not Edit, because Edit includes *Manage Lists*, which bypasses item-level security. The accounts group gets **Edit**, so it sees all items.
+   - `Timesheet Templates`, holding the three `.xlsx` files from `Templates/xlsx`.
+4. Add the app to the site, then add the **Timesheet** web part to a page. Its properties are the recipient email, the list title and the template library URL (leave this blank for `<site>/Timesheet Templates`).
 
-> Include any additional steps as needed.
+## Updating a template
 
-Other build commands can be listed using `heft --help`.
+The web part writes values into fixed cells (see section 6 of the spec and `src/timesheet/definitions.ts`), so a template change must keep the sheet name, the cell positions and the file name.
 
-## Features
-
-Description of the extension that expands upon high-level summary above.
-
-This extension illustrates the following concepts:
-
-- topic 1
-- topic 2
-- topic 3
-
-> Notice that better pictures and documentation will increase the sample usage and the value you are providing for others. Thanks for your submissions advance.
-
-> Share your web part with others through Microsoft 365 Patterns and Practices program to get visibility and exposure. More details on the community, open-source projects and other activities from http://aka.ms/m365pnp.
-
-## References
-
-- [Getting started with SharePoint Framework](https://docs.microsoft.com/sharepoint/dev/spfx/set-up-your-developer-tenant)
-- [Building for Microsoft teams](https://docs.microsoft.com/sharepoint/dev/spfx/build-for-teams-overview)
-- [Use Microsoft Graph in your solution](https://docs.microsoft.com/sharepoint/dev/spfx/web-parts/get-started/using-microsoft-graph-apis)
-- [Publish SharePoint Framework applications to the Marketplace](https://docs.microsoft.com/sharepoint/dev/spfx/publish-to-marketplace-overview)
-- [Microsoft 365 Patterns and Practices](https://aka.ms/m365pnp) - Guidance, tooling, samples and open-source controls for your Microsoft 365 development
-- [Heft Documentation](https://heft.rushstack.io/)
+1. Save the new macro-enabled workbook as `Templates/<Type> Timesheet Template (current).xlsm`.
+2. Run `pwsh scripts/Convert-Templates.ps1`. It strips the macros and writes `Templates/xlsx/<Type> Timesheet Template.xlsx`.
+3. Run `npm test`. The definitions test fails if headers or formula cells have moved.
+4. Replace the file in the `Timesheet Templates` library, keeping the same name.
