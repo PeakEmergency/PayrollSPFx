@@ -1,6 +1,7 @@
 import type * as ExcelJSType from 'exceljs';
+import { computeLine, computeTotals } from '../timesheet/calc';
 import { TEMPLATES } from '../timesheet/definitions';
-import { TimesheetData } from '../timesheet/types';
+import { Line, TimesheetData } from '../timesheet/types';
 import { normalizeDate, parseTime, timeToDayFraction, toExcelDate } from '../timesheet/values';
 
 /**
@@ -56,6 +57,18 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
   });
 
   if (data.type === 'Medic') fixMedicFormulas(ws, def.firstRow, def.firstRow + def.rowCount - 1);
+
+  // Cached results, so previewers that don't recalculate (Outlook, phones) show real totals.
+  const setResult = (address: string, result: Line[string] | undefined): void => {
+    const cell = ws.getCell(address);
+    if (typeof result === 'number' && cell.formula) cell.value = { ...(cell.value as ExcelJSType.CellFormulaValue), result };
+  };
+  for (let i = 0; i < def.rowCount; i++) {
+    const computed = computeLine(data.type, data.lines[i] || {});
+    def.columns.filter((c) => c.kind === 'computed').forEach((c) => setResult(`${c.col}${def.firstRow + i}`, computed[c.key]));
+  }
+  const totals = computeTotals(data.type, data.lines);
+  def.totals.forEach(({ key, cell }) => setResult(cell, totals[key]));
 
   wb.calcProperties.fullCalcOnLoad = true;
   return (await wb.xlsx.writeBuffer()) as ArrayBuffer;

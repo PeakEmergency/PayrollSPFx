@@ -70,6 +70,7 @@ export async function submitTimesheet(data: TimesheetData, deps: SubmitDeps): Pr
     lineItemsJson: JSON.stringify(data.lines.filter((l) => isEntered(data.type, l)).map((l) => computeLine(data.type, l)))
   });
 
+  let mailed = false;
   try {
     const content = await fillTemplate(await deps.templates.load(data.type), data);
     await deps.store.attach(id, fileName, content);
@@ -80,11 +81,20 @@ export async function submitTimesheet(data: TimesheetData, deps: SubmitDeps): Pr
       fileName,
       content
     });
+    mailed = true;
     await deps.store.setStatus(id, 'Sent');
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await deps.store.setStatus(id, 'Email failed', message);
+    // Once the email is out, never tell the user to resubmit: accounts would get a duplicate.
+    if (mailed) {
+      return { ok: false, errors: [`Your timesheet was sent, but its status could not be updated: ${message}`] };
+    }
+    try {
+      await deps.store.setStatus(id, 'Email failed', message);
+    } catch {
+      // Keep the original error for the user; the item stays Pending.
+    }
     return { ok: false, errors: [`Your timesheet was saved but the email was not sent: ${message}`] };
   }
 }

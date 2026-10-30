@@ -29,6 +29,9 @@ export function validate(data: TimesheetData): string[] {
         times[c.key] = parseTime(raw);
         if (!times[c.key]) errors.push(`Row ${row}: "${raw}" is not a valid time.`);
       });
+    inputs
+      .filter((c) => c.kind === 'number' && has(line[c.key]) && isNaN(Number(line[c.key])))
+      .forEach((c) => errors.push(`Row ${row}: "${line[c.key]}" is not a valid number.`));
     if (data.type === 'Admin' && times.start && times.end && times.end < times.start) {
       errors.push(`Row ${row}: end time is before start time.`);
     }

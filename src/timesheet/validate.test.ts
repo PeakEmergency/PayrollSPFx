@@ -36,3 +36,8 @@ it('valid admin data', () => {
   const lines = [{ date: '2026-10-15', start: '08:00', end: '16:30', deductions: 0.5, rate: 20 }];
   expect(validate({ ...base, type: 'Admin', lines })).toEqual([]);
 });
+
+it('invalid pay rate is reported with its row', () => {
+  const lines = [{ date: '2026-10-15', start: '08:00', end: '16:00', rate: '$25' }];
+  expect(validate({ ...base, type: 'Admin', lines })).toContain('Row 1: "$25" is not a valid number.');
+});

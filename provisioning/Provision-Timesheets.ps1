@@ -37,10 +37,11 @@ foreach ($f in $fields) {
     if (Get-PnPField -List $ListTitle -Identity $f.Name -ErrorAction SilentlyContinue) { Write-Host "  field $($f.Name) exists" }
     else {
         Add-PnPFieldFromXml -List $ListTitle -FieldXml $f.Xml | Out-Null
-        Add-PnPViewField -List $ListTitle -Identity 'All Items' -Field $f.Name -ErrorAction SilentlyContinue | Out-Null
         Write-Host "  added field $($f.Name)"
     }
 }
+
+Set-PnPView -List $ListTitle -Identity 'All Items' -Fields (@('LinkTitle') + ($fields | ? Name -ne 'LineItems' | % Name)) | Out-Null
 
 # --- Item-level security: users read and edit only their own items ---
 Set-PnPList -Identity $ListTitle -ReadSecurity 2 -WriteSecurity 2 | Out-Null

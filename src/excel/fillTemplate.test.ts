@@ -83,3 +83,15 @@ it('uppercase', async () => {
   const ws = await fill('Medic', [line]);
   expect(ws.getCell('C8').value).toBe('ACME');
 });
+
+it('formula cells carry computed results for previewers that do not recalculate', async () => {
+  const ws = await fill('Medic', [line]);
+  const result = (a: string): unknown => (ws.getCell(a).value as { result?: unknown }).result;
+  expect(result('F8')).toBe(12);
+  expect(result('H8')).toBe(450);
+  expect(result('K8')).toBe(147);
+  expect(result('L8')).toBe(597);
+  expect(result('F22')).toBe(12);
+  expect(result('J22')).toBe(47);
+  expect(result('L22')).toBe(597);
+});

@@ -79,3 +79,22 @@ it('template load failure marks item Email failed', async () => {
   expect(f.calls).not.toContain('send');
   expect(result.ok).toBe(false);
 });
+
+it('status update failure after the email was sent says the email went out', async () => {
+  const f = fakes();
+  f.deps.store.setStatus = async (id, status, detail) => {
+    f.statuses.push([id, status, detail]);
+    if (status === 'Sent') throw new Error('Save conflict');
+  };
+  const result = await submitTimesheet(data, f.deps);
+  expect(f.statuses.map((s) => s[1])).not.toContain('Email failed');
+  expect(result.ok).toBe(false);
+  expect(!result.ok && result.errors[0]).toContain('was sent');
+});
+
+it('status update failure in the error path keeps the original error', async () => {
+  const f = fakes({ sendError: new Error('Mailbox unavailable') });
+  f.deps.store.setStatus = async () => { throw new Error('List throttled'); };
+  const result = await submitTimesheet(data, f.deps);
+  expect(!result.ok && result.errors[0]).toContain('Mailbox unavailable');
+});
