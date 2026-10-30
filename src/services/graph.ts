@@ -17,7 +17,9 @@ export class GraphMailer implements Mailer {
   public constructor(private readonly client: MSGraphClientV3) {}
 
   public async send(m: MailMessage): Promise<void> {
-    await this.client.api('/me/sendMail').post({
+    await this.client
+      .api('/me/sendMail')
+      .post({
       message: {
         subject: m.subject,
         body: { contentType: 'Text', content: m.bodyText },
@@ -32,7 +34,10 @@ export class GraphMailer implements Mailer {
         ]
       },
       saveToSentItems: true
-    });
+      })
+      .catch((err: Error) => {
+        throw new Error(`Sending the email failed: ${err.message}`);
+      });
   }
 }
 

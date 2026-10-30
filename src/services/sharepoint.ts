@@ -10,17 +10,24 @@ const jsonHeaders = {
 
 const odataString = (s: string): string => encodeURIComponent(s.replace(/'/g, "''"));
 
-/** Throws with SharePoint's own error text on non-2xx. */
-async function check(res: SPHttpClientResponse): Promise<SPHttpClientResponse> {
+/** Throws with the step name and SharePoint's own error text on non-2xx. */
+async function check(step: string, request: Promise<SPHttpClientResponse>): Promise<SPHttpClientResponse> {
+  let res: SPHttpClientResponse;
+  try {
+    res = await request;
+  } catch (err) {
+    // Network-level failure (e.g. "Failed to fetch"): no response at all.
+    throw new Error(`${step} failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
   if (res.ok) return res;
-  let message = `${res.status} ${res.statusText}`;
+  let message = `${res.status} ${res.statusText}`.trim();
   try {
     const body = await res.json();
     message = body?.['odata.error']?.message?.value || body?.error?.message?.value || body?.error?.message || message;
   } catch {
     // not JSON; keep the status text
   }
-  throw new Error(message);
+  throw new Error(`${step} failed (${res.status}): ${message}`);
 }
 
 // Noon UTC keeps a date-only field on the same calendar day in any North American time zone.
@@ -35,7 +42,8 @@ export class SpSubmissionStore implements SubmissionStore {
 
   public async create(r: SubmissionRecord): Promise<number> {
     const res = await check(
-      await this.client.post(this.itemsUrl, SPHttpClient.configurations.v1, {
+      'Saving the list item',
+      this.client.post(this.itemsUrl, SPHttpClient.configurations.v1, {
         headers: jsonHeaders,
         body: JSON.stringify({
           Title: r.title,
@@ -54,7 +62,8 @@ export class SpSubmissionStore implements SubmissionStore {
 
   public async attach(id: number, fileName: string, content: ArrayBuffer): Promise<void> {
     await check(
-      await this.client.post(`${this.itemsUrl}(${id})/AttachmentFiles/add(FileName='${odataString(fileName)}')`, SPHttpClient.configurations.v1, {
+      'Attaching the file',
+      this.client.post(`${this.itemsUrl}(${id})/AttachmentFiles/add(FileName='${odataString(fileName)}')`, SPHttpClient.configurations.v1, {
         body: content
       })
     );
@@ -62,7 +71,8 @@ export class SpSubmissionStore implements SubmissionStore {
 
   public async setStatus(id: number, status: SubmissionStatus, detail?: string): Promise<void> {
     await check(
-      await this.client.post(`${this.itemsUrl}(${id})`, SPHttpClient.configurations.v1, {
+      'Updating the status',
+      this.client.post(`${this.itemsUrl}(${id})`, SPHttpClient.configurations.v1, {
         headers: { ...jsonHeaders, 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
         body: JSON.stringify({ Status: status, StatusDetail: detail || '' })
       })
@@ -80,7 +90,8 @@ export class SpTemplateSource implements TemplateSource {
   public async load(type: TimesheetType): Promise<ArrayBuffer> {
     const filePath = `${this.libraryServerRelativeUrl.replace(/\/$/, '')}/${TEMPLATES[type].fileName}`;
     const res = await check(
-      await this.client.get(
+      `Loading template ${filePath}`,
+      this.client.get(
         `${this.webUrl}/_api/web/GetFileByServerRelativePath(decodedurl='${odataString(filePath)}')/$value`,
         SPHttpClient.configurations.v1
       )

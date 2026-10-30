@@ -25,8 +25,8 @@ const formatComputed = (key: string, v: Line[string]): string =>
   typeof v !== 'number' ? '' : key === 'hours' ? v.toFixed(2) : money(v);
 
 function toColumn(c: ColumnDef): jspreadsheet.Column {
-  // Template's computed sub-total columns are ~1 char wide; keep them readable on screen.
-  const base = { title: c.header, width: Math.max(c.width, 70), align: 'center' as const };
+  // Excel shows a column ~5px wider than width × 7; 90px fits the bold two-line headers.
+  const base = { title: c.header, width: Math.max(c.width + 5, 90), align: 'center' as const };
   switch (c.kind) {
     case 'date':
       return { ...base, type: 'calendar', options: { format: 'DD/MM/YY' } };
@@ -151,6 +151,7 @@ export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridPr
         sync(instance);
       }
     });
+    ws.hideIndex(); // the template has no row numbers
     sync(ws);
 
     // Template fills: group colour on the group heading and its column titles, grey elsewhere.
@@ -165,7 +166,7 @@ export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridPr
       const groupCells = Array.from(headRows[0].querySelectorAll<HTMLElement>('td')).slice(1);
       groupCells.forEach((td) => {
         const g = (def.groups || []).find((x) => x.title === td.textContent?.trim());
-        td.style.background = g ? g.fill : 'transparent';
+        td.style.background = g ? g.fill : '#f2f2f2';
       });
     }
 

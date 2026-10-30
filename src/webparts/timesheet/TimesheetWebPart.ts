@@ -22,7 +22,12 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
   private _graph: Promise<MSGraphClientV3> | undefined;
 
   private get graph(): Promise<MSGraphClientV3> {
-    this._graph = this._graph || this.context.msGraphClientFactory.getClient('3');
+    this._graph =
+      this._graph ||
+      this.context.msGraphClientFactory.getClient('3').catch((err: Error) => {
+        this._graph = undefined; // retry on the next call
+        throw new Error(`Connecting to Microsoft Graph failed: ${err.message}`);
+      });
     return this._graph;
   }
 

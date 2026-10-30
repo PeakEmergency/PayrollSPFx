@@ -70,7 +70,7 @@ it('other templates untouched', async () => {
     const widths = (ws: ExcelJS.Worksheet): (number | string | undefined)[] => ws.columns.map((c) => (c.hidden ? 'hidden' : c.width));
     expect(widths(filled)).toEqual(widths(original));
   }
-});
+}, 60000); // loads and writes 8 workbooks
 
 it('times written as day fractions', async () => {
   const ws = await fill('Medic', [line]);

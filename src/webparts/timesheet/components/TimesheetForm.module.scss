@@ -112,6 +112,7 @@ $emptyFill: #fff2cc;
   // Column headers styled like the template's row 7.
   :global(.jss_worksheet thead td) {
     background: $headerFill;
+    text-align: center !important; // headers centred even over left-aligned text columns
     font-weight: bold;
     font-size: 10pt;
     white-space: normal;
