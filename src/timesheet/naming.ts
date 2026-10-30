@@ -13,7 +13,8 @@ export function formatEmployeeName(givenName: string | null, surname: string | n
   return (first ? `${last}, ${first}` : last).toUpperCase();
 }
 
-const ddmmyy = (iso: string | null): string => {
+/** 'yyyy-mm-dd' → 'dd/mm/yy'. */
+export const ddmmyy = (iso: string | null): string => {
   const [y, m, d] = (iso || '').split('-');
   return `${d}/${m}/${(y || '').slice(2)}`;
 };
