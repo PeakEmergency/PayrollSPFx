@@ -9,6 +9,8 @@ export interface ColumnDef {
   header: string;
   kind: ColumnKind;
   options?: number[];
+  /** Shown in the dropdown instead of the amount, same order as options. */
+  optionLabels?: string[];
   width: number;
 }
 

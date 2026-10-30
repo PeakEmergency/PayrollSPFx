@@ -86,7 +86,16 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       col('start', 'D', 'TIME START', 'time', 10.71),
       col('end', 'E', 'TIME END', 'time', 10.71),
       col('hours', 'F', 'HOURS(s)', 'computed', 10.71),
-      col('dayRate', 'G', 'RATE', 'dropdown', 10, [250, 350, 450, 550]),
+      {
+        ...col('dayRate', 'G', 'RATE', 'dropdown', 10, [250, 350, 450, 550]),
+        // Template lookup table M6:N9.
+        optionLabels: [
+          'Medic – Level NUEC-A/AP (PSL 8)',
+          'Medic – Level PCP(PSL 9)',
+          'Medic – Level ACP (PSL 10)',
+          'Medic – Level CCP/MD (PSL 11)'
+        ]
+      },
       col('medicTotal', 'H', 'TOTAL', 'computed', 0.86),
       col('travel', 'I', 'TRAVEL TIME', 'dropdown', 14.29, [100]),
       col('perDiem', 'J', 'PER DIEM', 'dropdown', 14.29, [47]),

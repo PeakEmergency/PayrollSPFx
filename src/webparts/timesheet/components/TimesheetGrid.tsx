@@ -30,7 +30,12 @@ function toColumn(c: ColumnDef): jspreadsheet.Column {
       return {
         ...base,
         type: 'dropdown',
-        source: (c.options || []).map((o) => ({ id: o, name: plainNumberKeys.indexOf(c.key) >= 0 ? String(o) : money(o) }))
+        // Labelled rates show the classification; the cell value stays the dollar amount.
+        width: c.optionLabels ? 230 : base.width,
+        source: (c.options || []).map((o, i) => ({
+          id: o,
+          name: c.optionLabels ? c.optionLabels[i] : plainNumberKeys.indexOf(c.key) >= 0 ? String(o) : money(o)
+        }))
       };
     case 'computed':
       return { ...base, type: 'text', readOnly: true };
