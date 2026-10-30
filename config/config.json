@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "timesheet-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/timesheet/TimesheetWebPart.js",
+          "manifest": "./src/webparts/timesheet/TimesheetWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "TimesheetWebPartStrings": "lib/webparts/timesheet/loc/{locale}.js"
+  }
+}
