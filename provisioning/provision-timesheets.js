@@ -46,7 +46,8 @@
     ['StatusDetail', '<Field Type="Note" Name="StatusDetail" StaticName="StatusDetail" DisplayName="Status Detail" RichText="FALSE" NumLines="3" />']
   ];
   for (const [name, xml] of fields) {
-    if (await sp(`${list}/fields/getbyinternalnameortitle('${name}')`)) { console.log(`  field ${name} exists`); continue; }
+    // getbyinternalnameortitle answers 400 (not 404) for a missing field, so filter instead.
+    if ((await sp(`${list}/fields?$filter=InternalName eq '${name}'&$select=Id`)).results.length) { console.log(`  field ${name} exists`); continue; }
     // AddToDefaultContentType (1) | AddFieldInternalNameHint (8) | AddFieldToDefaultView (16); LineItems stays out of the view.
     const options = name === 'LineItems' ? 9 : 25;
     await sp(`${list}/fields/createfieldasxml`, {
@@ -77,7 +78,7 @@
     await sp(`${list}/roleassignments/addroleassignment(principalid=${members.Id},roledefid=${contribute})`, { method: 'POST' });
     console.log(`List permissions: '${members.Title}' set to Contribute`);
   }
-  const accounts = await sp(`web/sitegroups/getbyname('${ACCOUNTS_GROUP}')`);
+  const [accounts] = (await sp(`web/sitegroups?$filter=Title eq '${ACCOUNTS_GROUP}'&$select=Id`)).results;
   if (!accounts) throw new Error(`SharePoint group '${ACCOUNTS_GROUP}' not found on this site`);
   await sp(`${list}/roleassignments/addroleassignment(principalid=${accounts.Id},roledefid=${edit})`, { method: 'POST' });
   console.log(`List permissions: '${ACCOUNTS_GROUP}' has Edit`);
