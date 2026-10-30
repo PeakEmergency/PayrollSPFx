@@ -1,5 +1,9 @@
 {
   "extends": "./node_modules/@microsoft/spfx-web-build-rig/profiles/default/tsconfig-base.json",
+  "compilerOptions": {
+    // "node" added so Jest tests can read the template fixtures from disk.
+    "types": ["jest", "webpack-env", "node"]
+  },
   "watchOptions": {
     // Prevent the TypeScript watch program from re-triggering incremental builds
     // when the copilot-agent task regenerates its outputs (temp/copilot staging
