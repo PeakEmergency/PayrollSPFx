@@ -40,6 +40,13 @@ describe('definitions match the real templates', () => {
     });
   });
 
+  it('every labelled dropdown has one label per option', () => {
+    Object.values(TEMPLATES).forEach((t) =>
+      t.columns.filter((c) => c.optionLabels).forEach((c) => expect(c.optionLabels!.length).toBe(c.options!.length))
+    );
+    expect(TEMPLATES.Instructor.columns.find((c) => c.key === 'dayRate')!.optionLabels).toBeDefined();
+  });
+
   it('medic day rates', () => {
     expect(TEMPLATES.Medic.columns.find((c) => c.key === 'dayRate')!.options).toEqual([250, 350, 450, 550]);
   });

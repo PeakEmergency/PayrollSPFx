@@ -50,7 +50,19 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       col('date', 'A', 'DATE', 'date', 10.71),
       col('course', 'C', 'COURSE #', 'upper', 14.29),
       col('days', 'D', 'DAY(s)', 'dropdown', 14.29, [0.5, 1]),
-      col('dayRate', 'E', 'RATE', 'dropdown', 14.29, [0, 150, 225, 280, 320, 340, 350]),
+      {
+        ...col('dayRate', 'E', 'RATE', 'dropdown', 14.29, [0, 150, 225, 280, 320, 340, 350]),
+        // Classifications from Peak Emergency (the template has only the amounts, XFC2:XFC8).
+        optionLabels: [
+          'Instructor – Level Candidate (PSL 1)',
+          'Instructor – Level Mentee (PSL 2)',
+          'Instructor – Level 1 (PSL 3)',
+          'Instructor – Level 2 (PSL 4)',
+          'Instructor – Level 3 (PSL 5)',
+          'Instructor – Level 4 (PSL 6)',
+          'Instructor – Level 5 (PSL 7)'
+        ]
+      },
       col('instrTotal', 'F', 'TOTAL', 'computed', 1.14),
       col('adminHours', 'G', 'HOUR(s)', 'dropdown', 14.29, quarterHours),
       col('adminRate', 'H', 'RATE', 'dropdown', 14.29, [25]),
