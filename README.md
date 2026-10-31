@@ -53,7 +53,7 @@ Build once, signed in as an account that has **Send As** on the schedule mailbox
    - To: `Email To`; Subject: `Email Subject`; Body: `Email Body` (all from the trigger)
    - Attachments Name: expression `first(body('Get_attachments'))?['DisplayName']`; Content: `File Content` from step 3
 5. **Mark sent:** SharePoint *Send an HTTP request to SharePoint*. Method `POST`, Uri `_api/web/lists/getbytitle('Timesheet Submissions')/items(@{triggerOutputs()?['body/ID']})`, Headers `Accept` and `Content-Type` = `application/json;odata=nometadata`, `IF-MATCH` = `*`, `X-HTTP-Method` = `MERGE`. Body: `{"Status": "Sent", "StatusDetail": ""}`
-6. **Mark failed:** a second *Send an HTTP request to SharePoint* like step 5, with Body `{"Status": "Email failed", "StatusDetail": "Email flow failed: see the flow run history"}`. Open its **⋯ → Configure run after** and tick only *has failed* and *has timed out* on the step 4 action, and set step 5 to run after step 4 *is successful* only.
+6. **Mark failed:** a second *Send an HTTP request to SharePoint* like step 5, with Body `{"Status": "Email failed", "StatusDetail": "Email flow failed: see the flow run history"}`. Open its **⋯ → Configure run after** and tick *has failed*, *has timed out* and *is skipped* on the step 4 action (skipped means step 2 or 3 failed), and set step 5 to run after step 4 *is successful* only.
 
 The flow updates the item, which fires the trigger again, but the trigger condition skips anything not `Queued`.
 
