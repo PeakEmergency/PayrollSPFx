@@ -67,7 +67,7 @@ export default function TimesheetForm({ emailTo, getName, submit }: ITimesheetFo
     try {
       const result = await submit(data);
       if (result.ok) {
-        setSent(`Timesheet sent to ${emailTo}.`);
+        setSent(`Timesheet submitted. It will be emailed to ${emailTo} within a few minutes.`);
         setLines([]);
         setFrom('');
         setTo('');

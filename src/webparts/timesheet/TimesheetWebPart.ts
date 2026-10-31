@@ -7,7 +7,7 @@ import { MSGraphClientV3 } from '@microsoft/sp-http';
 
 import * as strings from 'TimesheetWebPartStrings';
 import TimesheetForm, { ITimesheetFormProps } from './components/TimesheetForm';
-import { getCurrentEmployee, GraphMailer } from '../../services/graph';
+import { getCurrentEmployee } from '../../services/graph';
 import { SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
 import { submitTimesheet } from '../../services/submit';
 
@@ -43,9 +43,9 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
         submitTimesheet(data, {
           store: new SpSubmissionStore(this.context.spHttpClient, web.absoluteUrl, listTitle),
           templates: new SpTemplateSource(this.context.spHttpClient, web.absoluteUrl, templateLibraryUrl),
-          mailer: new GraphMailer(await this.graph),
           emailTo,
-          employeeId: this.context.pageContext.legacyPageContext.userId
+          employeeId: this.context.pageContext.legacyPageContext.userId,
+          senderEmail: this.context.pageContext.user.email
         })
     };
 

@@ -24,5 +24,5 @@ export function buildFileName(data: TimesheetData): string {
 }
 
 export function buildSubject(data: TimesheetData): string {
-  return `${data.type} Timesheet – ${data.name} – ${ddmmyy(data.from)} to ${ddmmyy(data.to)}`;
+  return `${data.type} Timesheet from ${data.name} – ${ddmmyy(data.from)} to ${ddmmyy(data.to)}`;
 }

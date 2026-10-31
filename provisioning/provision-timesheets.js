@@ -42,20 +42,33 @@
     ['PayPeriodEnd', '<Field Type="DateTime" Name="PayPeriodEnd" StaticName="PayPeriodEnd" DisplayName="Pay Period End" Format="DateOnly" />'],
     ['TotalAmount', '<Field Type="Currency" Name="TotalAmount" StaticName="TotalAmount" DisplayName="Total Amount" LCID="1033" Decimals="2" />'],
     ['LineItems', '<Field Type="Note" Name="LineItems" StaticName="LineItems" DisplayName="Line Items" RichText="FALSE" NumLines="6" />'],
-    ['Status', '<Field Type="Choice" Name="Status" StaticName="Status" DisplayName="Status"><Default>Pending</Default><CHOICES><CHOICE>Pending</CHOICE><CHOICE>Sent</CHOICE><CHOICE>Email failed</CHOICE></CHOICES></Field>'],
-    ['StatusDetail', '<Field Type="Note" Name="StatusDetail" StaticName="StatusDetail" DisplayName="Status Detail" RichText="FALSE" NumLines="3" />']
+    ['Status', '<Field Type="Choice" Name="Status" StaticName="Status" DisplayName="Status"><Default>Pending</Default><CHOICES><CHOICE>Pending</CHOICE><CHOICE>Queued</CHOICE><CHOICE>Sent</CHOICE><CHOICE>Email failed</CHOICE></CHOICES></Field>'],
+    ['StatusDetail', '<Field Type="Note" Name="StatusDetail" StaticName="StatusDetail" DisplayName="Status Detail" RichText="FALSE" NumLines="3" />'],
+    // Read by the Power Automate flow that sends the email.
+    ['EmailTo', '<Field Type="Text" Name="EmailTo" StaticName="EmailTo" DisplayName="Email To" />'],
+    ['EmailSubject', '<Field Type="Text" Name="EmailSubject" StaticName="EmailSubject" DisplayName="Email Subject" MaxLength="255" />'],
+    ['EmailBody', '<Field Type="Note" Name="EmailBody" StaticName="EmailBody" DisplayName="Email Body" RichText="FALSE" NumLines="6" />']
   ];
+  const hiddenFromView = ['LineItems', 'EmailTo', 'EmailSubject', 'EmailBody'];
   for (const [name, xml] of fields) {
     // getbyinternalnameortitle answers 400 (not 404) for a missing field, so filter instead.
     if ((await sp(`${list}/fields?$filter=InternalName eq '${name}'&$select=Id`)).results.length) { console.log(`  field ${name} exists`); continue; }
-    // AddToDefaultContentType (1) | AddFieldInternalNameHint (8) | AddFieldToDefaultView (16); LineItems stays out of the view.
-    const options = name === 'LineItems' ? 9 : 25;
+    // AddToDefaultContentType (1) | AddFieldInternalNameHint (8) | AddFieldToDefaultView (16).
+    const options = hiddenFromView.includes(name) ? 9 : 25;
     await sp(`${list}/fields/createfieldasxml`, {
       method: 'POST',
       body: { parameters: { __metadata: { type: 'SP.XmlSchemaFieldCreationInformation' }, SchemaXml: xml, Options: options } }
     });
     console.log(`  added field ${name}`);
   }
+
+  // Lists made before the email flow lack the Queued status.
+  await sp(`${list}/fields/getbyinternalnameortitle('Status')`, {
+    method: 'POST',
+    headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+    body: { __metadata: { type: 'SP.FieldChoice' }, Choices: { __metadata: { type: 'Collection(Edm.String)' }, results: ['Pending', 'Queued', 'Sent', 'Email failed'] } }
+  });
+  console.log('Status choices: Pending, Queued, Sent, Email failed');
 
   // --- Item-level security: users read and edit only their own items ---
   await sp(list, {

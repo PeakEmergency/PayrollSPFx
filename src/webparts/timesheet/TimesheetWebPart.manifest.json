@@ -22,7 +22,7 @@
     "description": { "default": "Peak Emergency timesheets" },
     "officeFabricIconFontName": "Page",
     "properties": {
-      "emailTo": "account@peakemergency.com",
+      "emailTo": "accounting@peakemergency.com",
       "listTitle": "Timesheet Submissions",
       "templateLibraryUrl": ""
     }

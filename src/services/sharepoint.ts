@@ -53,6 +53,9 @@ export class SpSubmissionStore implements SubmissionStore {
           PayPeriodEnd: dateOnly(r.to),
           TotalAmount: r.totalAmount,
           LineItems: r.lineItemsJson,
+          EmailTo: r.emailTo,
+          EmailSubject: r.emailSubject,
+          EmailBody: r.emailBody,
           Status: 'Pending'
         })
       })

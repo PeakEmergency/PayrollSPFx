@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { MailMessage, SubmissionRecord, SubmissionStatus, SubmitDeps, submitTimesheet } from './submit';
+import { SubmissionRecord, SubmissionStatus, SubmitDeps, submitTimesheet } from './submit';
 import { TimesheetData, TimesheetType } from '../timesheet/types';
 
 const medicFixture = fs.readFileSync(path.resolve(__dirname, '../../Templates/xlsx/Medic Timesheet Template.xlsx'));
@@ -17,18 +17,18 @@ interface Fakes {
   deps: SubmitDeps;
   calls: string[];
   created: SubmissionRecord[];
-  sent: MailMessage[];
   statuses: [number, SubmissionStatus, string | undefined][];
 }
 
-function fakes(opts: { sendError?: Error; loadError?: Error } = {}): Fakes {
-  const f: Fakes = { calls: [], created: [], sent: [], statuses: [], deps: undefined! };
+function fakes(opts: { attachError?: Error; loadError?: Error } = {}): Fakes {
+  const f: Fakes = { calls: [], created: [], statuses: [], deps: undefined! };
   f.deps = {
-    emailTo: 'account@peakemergency.com',
+    emailTo: 'accounting@peakemergency.com',
     employeeId: 7,
+    senderEmail: 'carolyn@peakemergency.com',
     store: {
       create: async (r) => { f.calls.push('create'); f.created.push(r); return 42; },
-      attach: async () => { f.calls.push('attach'); },
+      attach: async () => { f.calls.push('attach'); if (opts.attachError) throw opts.attachError; },
       setStatus: async (id, status, detail) => { f.calls.push(`setStatus(${status})`); f.statuses.push([id, status, detail]); }
     },
     templates: {
@@ -37,23 +37,44 @@ function fakes(opts: { sendError?: Error; loadError?: Error } = {}): Fakes {
         if (opts.loadError) throw opts.loadError;
         return new Uint8Array(medicFixture).buffer;
       }
-    },
-    mailer: {
-      send: async (m) => { f.calls.push('send'); f.sent.push(m); if (opts.sendError) throw opts.sendError; }
     }
   };
   return f;
 }
 
-it('happy path', async () => {
+it('happy path queues the item for the email flow', async () => {
   const f = fakes();
   expect(await submitTimesheet(data, f.deps)).toEqual({ ok: true });
-  expect(f.calls).toEqual(['create', 'load', 'attach', 'send', 'setStatus(Sent)']);
-  expect(f.created[0]).toMatchObject({ totalAmount: 597, employeeId: 7, type: 'Medic', from: '2026-10-01', to: '2026-10-15' });
+  // Queued only after the file is attached: the flow triggers on Status = Queued.
+  expect(f.calls).toEqual(['create', 'load', 'attach', 'setStatus(Queued)']);
+  expect(f.created[0]).toMatchObject({
+    title: 'Medic Timesheet - NIKODYM, CAROLYN - 2026-10-01_2026-10-15.xlsx',
+    totalAmount: 597,
+    employeeId: 7,
+    type: 'Medic',
+    from: '2026-10-01',
+    to: '2026-10-15',
+    emailTo: 'accounting@peakemergency.com',
+    emailSubject: 'Medic Timesheet from NIKODYM, CAROLYN – 01/10/26 to 15/10/26'
+  });
   expect(JSON.parse(f.created[0].lineItemsJson)).toHaveLength(1);
-  expect(f.sent[0].to).toBe('account@peakemergency.com');
-  expect(f.sent[0].fileName).toBe('Medic Timesheet - NIKODYM, CAROLYN - 2026-10-01_2026-10-15.xlsx');
-  expect(f.sent[0].bodyText).toBe('Medic timesheet for NIKODYM, CAROLYN, 01/10/26 to 15/10/26. Total: $597.00.');
+});
+
+it('email body names the real sender with their email', () => {
+  const f = fakes();
+  return submitTimesheet(data, f.deps).then(() => {
+    const body = f.created[0].emailBody;
+    expect(body).toContain('NIKODYM, CAROLYN');
+    expect(body).toContain('carolyn@peakemergency.com');
+    expect(body).toContain('01/10/26 to 15/10/26');
+    expect(body).toContain('$597.00');
+  });
+});
+
+it('email body escapes HTML in names', async () => {
+  const f = fakes();
+  await submitTimesheet({ ...data, name: 'SMITH & SONS, <B>' }, f.deps);
+  expect(f.created[0].emailBody).toContain('SMITH &amp; SONS, &lt;B&gt;');
 });
 
 it('invalid data never touches SharePoint', async () => {
@@ -63,38 +84,25 @@ it('invalid data never touches SharePoint', async () => {
   expect(f.calls).toEqual([]);
 });
 
-it('send failure marks item Email failed and keeps file', async () => {
-  const f = fakes({ sendError: new Error('Mailbox unavailable') });
+it('attach failure marks item Email failed and is never queued', async () => {
+  const f = fakes({ attachError: new Error('Attachment too large') });
   const result = await submitTimesheet(data, f.deps);
-  expect(f.calls).toContain('attach');
-  expect(f.statuses).toEqual([[42, 'Email failed', 'Mailbox unavailable']]);
+  expect(f.statuses).toEqual([[42, 'Email failed', 'Attachment too large']]);
   expect(result.ok).toBe(false);
-  expect(!result.ok && result.errors[0]).toContain('Mailbox unavailable');
+  expect(!result.ok && result.errors[0]).toContain('Attachment too large');
 });
 
 it('template load failure marks item Email failed', async () => {
   const f = fakes({ loadError: new Error('Template not found') });
   const result = await submitTimesheet(data, f.deps);
   expect(f.statuses).toEqual([[42, 'Email failed', 'Template not found']]);
-  expect(f.calls).not.toContain('send');
+  expect(f.calls).not.toContain('attach');
   expect(result.ok).toBe(false);
-});
-
-it('status update failure after the email was sent says the email went out', async () => {
-  const f = fakes();
-  f.deps.store.setStatus = async (id, status, detail) => {
-    f.statuses.push([id, status, detail]);
-    if (status === 'Sent') throw new Error('Save conflict');
-  };
-  const result = await submitTimesheet(data, f.deps);
-  expect(f.statuses.map((s) => s[1])).not.toContain('Email failed');
-  expect(result.ok).toBe(false);
-  expect(!result.ok && result.errors[0]).toContain('was sent');
 });
 
 it('status update failure in the error path keeps the original error', async () => {
-  const f = fakes({ sendError: new Error('Mailbox unavailable') });
+  const f = fakes({ loadError: new Error('Template not found') });
   f.deps.store.setStatus = async () => { throw new Error('List throttled'); };
   const result = await submitTimesheet(data, f.deps);
-  expect(!result.ok && result.errors[0]).toContain('Mailbox unavailable');
+  expect(!result.ok && result.errors[0]).toContain('Template not found');
 });

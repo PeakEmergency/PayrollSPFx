@@ -14,5 +14,5 @@ it('buildFileName', () => {
 });
 
 it('buildSubject', () => {
-  expect(buildSubject(data)).toBe('Medic Timesheet – NIKODYM, CAROLYN – 01/10/26 to 15/10/26');
+  expect(buildSubject(data)).toBe('Medic Timesheet from NIKODYM, CAROLYN – 01/10/26 to 15/10/26');
 });

@@ -5,8 +5,9 @@ import { buildFileName, buildSubject, ddmmyy } from '../timesheet/naming';
 import { TimesheetData, TimesheetType } from '../timesheet/types';
 import { validate } from '../timesheet/validate';
 
-export type SubmissionStatus = 'Pending' | 'Sent' | 'Email failed';
+export type SubmissionStatus = 'Pending' | 'Queued' | 'Sent' | 'Email failed';
 
+/** List item. emailTo/emailSubject/emailBody are read by the Power Automate flow that sends the email. */
 export interface SubmissionRecord {
   title: string;
   type: TimesheetType;
@@ -15,6 +16,10 @@ export interface SubmissionRecord {
   to: string;
   totalAmount: number;
   lineItemsJson: string;
+  emailTo: string;
+  emailSubject: string;
+  /** HTML. */
+  emailBody: string;
 }
 
 export interface SubmissionStore {
@@ -27,24 +32,13 @@ export interface TemplateSource {
   load(type: TimesheetType): Promise<ArrayBuffer>;
 }
 
-export interface MailMessage {
-  to: string;
-  subject: string;
-  bodyText: string;
-  fileName: string;
-  content: ArrayBuffer;
-}
-
-export interface Mailer {
-  send(m: MailMessage): Promise<void>;
-}
-
 export interface SubmitDeps {
   store: SubmissionStore;
   templates: TemplateSource;
-  mailer: Mailer;
   emailTo: string;
   employeeId: number;
+  /** Signed-in user's email, named in the body: the flow sends from the shared schedule mailbox. */
+  senderEmail: string;
 }
 
 export type SubmitResult = { ok: true } | { ok: false; errors: string[] };
@@ -52,7 +46,22 @@ export type SubmitResult = { ok: true } | { ok: false; errors: string[] };
 const isEntered = (type: TimesheetType, line: TimesheetData['lines'][number]): boolean =>
   TEMPLATES[type].columns.some((c) => c.kind !== 'computed' && line[c.key] !== null && line[c.key] !== undefined && String(line[c.key]).trim() !== '');
 
-/** validate → list item (Pending) → fill template → attach → email → Sent. Failures after the item exists mark it 'Email failed'. */
+const escapeHtml = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function buildBody(data: TimesheetData, senderEmail: string, total: number): string {
+  return [
+    `${data.type} timesheet submitted by <b>${escapeHtml(data.name)}</b> (${escapeHtml(senderEmail)}).`,
+    `Pay period: ${ddmmyy(data.from)} to ${ddmmyy(data.to)}`,
+    `Total: $${total.toFixed(2)}`
+  ].join('<br>');
+}
+
+/**
+ * validate → list item (Pending) → fill template → attach → Queued.
+ * A Power Automate flow emails items once they are Queued and sets Sent / Email failed.
+ * Failures here mark the item 'Email failed'.
+ */
 export async function submitTimesheet(data: TimesheetData, deps: SubmitDeps): Promise<SubmitResult> {
   const errors = validate(data);
   if (errors.length) return { ok: false, errors };
@@ -67,34 +76,24 @@ export async function submitTimesheet(data: TimesheetData, deps: SubmitDeps): Pr
     from: data.from!,
     to: data.to!,
     totalAmount: total,
-    lineItemsJson: JSON.stringify(data.lines.filter((l) => isEntered(data.type, l)).map((l) => computeLine(data.type, l)))
+    lineItemsJson: JSON.stringify(data.lines.filter((l) => isEntered(data.type, l)).map((l) => computeLine(data.type, l))),
+    emailTo: deps.emailTo,
+    emailSubject: buildSubject(data),
+    emailBody: buildBody(data, deps.senderEmail, total)
   });
 
-  let mailed = false;
   try {
     const content = await fillTemplate(await deps.templates.load(data.type), data);
     await deps.store.attach(id, fileName, content);
-    await deps.mailer.send({
-      to: deps.emailTo,
-      subject: buildSubject(data),
-      bodyText: `${data.type} timesheet for ${data.name}, ${ddmmyy(data.from)} to ${ddmmyy(data.to)}. Total: $${total.toFixed(2)}.`,
-      fileName,
-      content
-    });
-    mailed = true;
-    await deps.store.setStatus(id, 'Sent');
+    await deps.store.setStatus(id, 'Queued');
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    // Once the email is out, never tell the user to resubmit: accounts would get a duplicate.
-    if (mailed) {
-      return { ok: false, errors: [`Your timesheet was sent, but its status could not be updated: ${message}`] };
-    }
     try {
       await deps.store.setStatus(id, 'Email failed', message);
     } catch {
       // Keep the original error for the user; the item stays Pending.
     }
-    return { ok: false, errors: [`Your timesheet was saved but the email was not sent: ${message}`] };
+    return { ok: false, errors: [`Your timesheet was saved but could not be queued for email: ${message}`] };
   }
 }
