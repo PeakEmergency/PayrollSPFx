@@ -50,8 +50,9 @@ The package is `sharepoint/solution/peak-timesheets.sppkg`.
 3. **Get attachment content:** SharePoint *Get attachment content*, Id = `ID`, File Identifier = expression `first(body('Get_attachments'))?['Id']`.
 4. **Send:** Office 365 Outlook *Send an email (V2)*, using the connection signed in as `schedule@`.
    - To: `Email To`; Subject: `Email Subject`; Body: `Email Body` (all from the trigger)
-   - Attachments Name: expression `first(body('Get_attachments'))?['DisplayName']`; Content: `File Content` from step 3
-5. **Mark sent:** SharePoint *Send an HTTP request to SharePoint*. Method `POST`, Uri `_api/web/lists/getbytitle('Timesheet Submissions')/items(@{triggerOutputs()?['body/ID']})`, Headers `Accept` and `Content-Type` = `application/json;odata=nometadata`, `IF-MATCH` = `*`, `X-HTTP-Method` = `MERGE`. Body: `{"Status": "Sent", "StatusDetail": ""}`
+   - Attachments Name: expression `first(body('Get_attachments'))?['DisplayName']`; Content: `Attachment Content` from step 3
+   - Set the attachment in the **classic designer** (turn off *New designer*). The new designer silently saves the attachment content as `null`. Check with **⋯ → Peek code** that `ContentBytes` is `@body('Get_attachment_content')`.
+5. **Mark sent:** SharePoint *Send an HTTP request to SharePoint*. Method `PATCH`, Uri `_api/web/lists/getbytitle('Timesheet Submissions')/items(@{triggerBody()?['ID']})`, Headers `Accept` and `Content-Type` = `application/json;odata=nometadata`, `IF-MATCH` = `*`. Body: `{"Status": "Sent", "StatusDetail": ""}`
 6. **Mark failed:** a second *Send an HTTP request to SharePoint* like step 5, with Body `{"Status": "Email failed", "StatusDetail": "Email flow failed: see the flow run history"}`. Open its **⋯ → Configure run after** and tick *has failed*, *has timed out* and *is skipped* on the step 4 action (skipped means step 2 or 3 failed), and set step 5 to run after step 4 *is successful* only.
 
 The flow updates the item, which fires the trigger again, but the trigger condition skips anything not `Queued`.
