@@ -42,14 +42,13 @@ The package is `sharepoint/solution/peak-timesheets.sppkg`.
 
 ## Email flow (Power Automate)
 
-Build once, signed in as an account that has **Send As** on the schedule mailbox and Edit on the list. (Exchange admin center → Mailboxes → schedule → Delegation → Send As.)
+`schedule@` is a licensed user mailbox, so the flow's **Office 365 Outlook** connection signs in as `schedule@peakemergencytraining.onmicrosoft.com` and sends as itself; no Send As delegation is needed. The **SharePoint** connections can use any account with Edit on the list.
 
 1. **Trigger:** SharePoint *When an item is created or modified*. Site `https://peakemergency.sharepoint.com`, list `Timesheet Submissions`. In the trigger's **Settings → Trigger conditions** add:
    `@equals(triggerOutputs()?['body/Status/Value'], 'Queued')`
 2. **Get attachments:** SharePoint *Get attachments*, same site and list, Id = `ID` from the trigger.
 3. **Get attachment content:** SharePoint *Get attachment content*, Id = `ID`, File Identifier = expression `first(body('Get_attachments'))?['Id']`.
-4. **Send:** Office 365 Outlook *Send an email from a shared mailbox (V2)*.
-   - Original Mailbox Address: `schedule@peakemergencytraining.onmicrosoft.com`
+4. **Send:** Office 365 Outlook *Send an email (V2)*, using the connection signed in as `schedule@`.
    - To: `Email To`; Subject: `Email Subject`; Body: `Email Body` (all from the trigger)
    - Attachments Name: expression `first(body('Get_attachments'))?['DisplayName']`; Content: `File Content` from step 3
 5. **Mark sent:** SharePoint *Send an HTTP request to SharePoint*. Method `POST`, Uri `_api/web/lists/getbytitle('Timesheet Submissions')/items(@{triggerOutputs()?['body/ID']})`, Headers `Accept` and `Content-Type` = `application/json;odata=nometadata`, `IF-MATCH` = `*`, `X-HTTP-Method` = `MERGE`. Body: `{"Status": "Sent", "StatusDetail": ""}`
