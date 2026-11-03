@@ -2,7 +2,7 @@ import { calculateReport, formatCurrency, formatQuantity } from './domain/calcul
 import { createReport } from './domain/report';
 import { validateReport } from './domain/report';
 import { calendarStartDate, formatDateInput, fromCalendarDate, parseDateInput, toCalendarDate } from './domain/dates';
-import type { ExpenseReport, Instructor } from './domain/models';
+import type { ExpenseReport } from './domain/models';
 
 describe('blank expense report', () => {
   it('creates thirteen independently editable slots and snapshots the configured rate', () => {
@@ -81,7 +81,6 @@ describe('explicit date-only helpers', () => {
   });
 });
 
-const roster: Instructor[] = [{ id: 'instructor-1', name: 'Ada Instructor' }, { id: 'instructor-2', name: 'Bea Instructor' }];
 function validHeader(): ExpenseReport {
   const report = createReport();
   report.instructorId = 'instructor-1';
@@ -92,47 +91,37 @@ function validHeader(): ExpenseReport {
 }
 
 describe('save validation', () => {
-  it('allows valid roster and pay-period headers with every expense row empty and no receipts', () => {
-    expect(validateReport(validHeader(), roster)).toEqual([]);
+  it('allows a named user and pay-period headers with every expense row empty and no receipts', () => {
+    expect(validateReport(validHeader())).toEqual([]);
   });
 
   it('collects missing header fields without requiring any expense detail', () => {
-    const issues = validateReport(createReport(), roster);
+    const issues = validateReport(createReport());
     expect(issues.map(issue => issue.field)).toEqual(['instructorId', 'fromDate', 'toDate']);
     expect(issues.every(issue => issue.message.length > 0)).toBe(true);
   });
 
-  it.each([
-    ['', ''],
-    ['instructor-1', 'PICK FROM DROPDOWN'],
-    ['unknown', 'Ada Instructor']
-  ])('rejects instructor selection outside the actual roster: %s / %s', (id, name) => {
-    const report = validHeader(); report.instructorId = id; report.instructorName = name;
-    expect(validateReport(report, roster).some(issue => issue.field === 'instructorId')).toBe(true);
-  });
-
-  it('preserves historical display-name snapshots when a valid roster identity is renamed or inactive', () => {
-    const report = validHeader(); report.instructorName = 'Ada Previous Name';
-    expect(validateReport(report, [{ id: 'instructor-1', name: 'Ada Renamed', active: false }])).toEqual([]);
-    report.instructorName = '   ';
-    expect(validateReport(report, roster).some(issue => issue.field === 'instructorId')).toBe(true);
+  it('asks for a refresh when the signed-in name is blank, and accepts a name', () => {
+    expect(validateReport(createReport())).toContainEqual({ field: 'instructorId', message: "Your name couldn't be loaded. Refresh the page." });
+    const report = validHeader(); report.instructorName = 'SMITH, A';
+    expect(validateReport(report).some(issue => issue.field === 'instructorId')).toBe(false);
   });
 
   it('allows same-day periods and rejects reversed or invalid pay dates', () => {
     const report = validHeader();
     report.toDate = report.fromDate;
-    expect(validateReport(report, roster)).toEqual([]);
+    expect(validateReport(report)).toEqual([]);
     report.toDate = '29/02/24';
-    expect(validateReport(report, roster).some(issue => issue.field === 'toDate')).toBe(true);
+    expect(validateReport(report).some(issue => issue.field === 'toDate')).toBe(true);
     report.fromDate = '31/02/24';
-    expect(validateReport(report, roster).some(issue => issue.field === 'fromDate')).toBe(true);
+    expect(validateReport(report).some(issue => issue.field === 'fromDate')).toBe(true);
   });
 
   it('requires thirteen slots and unique nonempty line identities', () => {
     const report = validHeader(); report.lines.pop();
-    expect(validateReport(report, roster).some(issue => issue.field === 'lines')).toBe(true);
+    expect(validateReport(report).some(issue => issue.field === 'lines')).toBe(true);
     const duplicated = validHeader(); duplicated.lines[1].id = duplicated.lines[0].id;
-    expect(validateReport(duplicated, roster).some(issue => issue.field === 'lines.1.id')).toBe(true);
+    expect(validateReport(duplicated).some(issue => issue.field === 'lines.1.id')).toBe(true);
   });
 
   it('rejects malformed populated detail dates and numeric fields while retaining raw input', () => {
@@ -142,7 +131,7 @@ describe('save validation', () => {
     report.lines[1].gst = 'NaN';
     report.lines[2].cost = 'Infinity';
     report.lines[3].rate = 'bad';
-    expect(validateReport(report, roster).map(issue => issue.field)).toEqual([
+    expect(validateReport(report).map(issue => issue.field)).toEqual([
       'lines.0.date', 'lines.0.kilometres', 'lines.1.gst', 'lines.2.cost', 'lines.3.rate'
     ]);
     expect(report.lines[0].kilometres).toBe('ten');
@@ -155,7 +144,7 @@ describe('save validation', () => {
     report.lines[0].cost = '-2.50';
     report.lines[1].gst = '5';
     report.lines[2].description = '123';
-    expect(validateReport(report, roster)).toEqual([]);
+    expect(validateReport(report)).toEqual([]);
   });
 });
 
@@ -273,7 +262,7 @@ describe('workbook calculations', () => {
     const report = createReport();
     report.lines[0].rate = '';
     expect(calculateReport(report).lines[0].mileage).toBeNull();
-    expect(validateReport(report, roster).some(issue => issue.field === 'lines.0.rate')).toBe(true);
+    expect(validateReport(report).some(issue => issue.field === 'lines.0.rate')).toBe(true);
   });
 
   it('formats quantities without hiding fractional kilometres and currency with grouping', () => {

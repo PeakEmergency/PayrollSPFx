@@ -1,9 +1,9 @@
-import type { ExpenseReport, Instructor, ReceiptInfo, ReportSummary } from '../domain/models';
+import type { ExpenseReport, ReceiptInfo, ReportSummary } from '../domain/models';
 import { formatDateInput, parseDateInput } from '../domain/dates';
 import { ReportServiceError, type IReportService } from './IReportService';
 import { decodeReport, encodeReport } from './reportCodec';
 export interface HttpTransport { request(url: string, init: RequestInit): Promise<Response>; }
-export interface SharePointReportServiceConfig { siteUrl: string; reportsListTitle: string; instructorsListTitle: string; }
+export interface SharePointReportServiceConfig { siteUrl: string; reportsListTitle: string; }
 type JsonObject = Record<string, unknown>;
 function invalid(message: string): never { throw new ReportServiceError(message, 'invalidData'); }
 function object(value: unknown): JsonObject {
@@ -43,17 +43,15 @@ export async function equalReceiptBytes(file: File, existing: ArrayBuffer): Prom
 export class SharePointReportService implements IReportService {
   private readonly siteUrl: string;
   private readonly reportsUrl: string;
-  private readonly instructorsUrl: string;
   public constructor(private readonly transport: HttpTransport, config: SharePointReportServiceConfig) {
     let site: URL;
     try { site = new URL(config.siteUrl); } catch { throw new ReportServiceError('Configure an absolute SharePoint site URL.', 'configuration'); }
-    if (site.protocol !== 'https:' || site.search || site.hash || site.username || site.password || !config.reportsListTitle.trim() || !config.instructorsListTitle.trim() || config.reportsListTitle === config.instructorsListTitle) {
-      throw new ReportServiceError('Configure an HTTPS SharePoint site and two distinct nonblank list titles.', 'configuration');
+    if (site.protocol !== 'https:' || site.search || site.hash || site.username || site.password || !config.reportsListTitle.trim()) {
+      throw new ReportServiceError('Configure an HTTPS SharePoint site and a nonblank list title.', 'configuration');
     }
     this.siteUrl = site.href.replace(/\/$/, '');
     const list = (title: string): string => `${this.siteUrl}/_api/web/lists/getbytitle('${literal(title)}')`;
     this.reportsUrl = list(config.reportsListTitle);
-    this.instructorsUrl = list(config.instructorsListTitle);
   }
   private async request(url: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
@@ -109,19 +107,8 @@ export class SharePointReportService implements IReportService {
     }
     return rows;
   }
-  public async getInstructors(): Promise<Instructor[]> {
-    const rows = await this.collection(`${this.instructorsUrl}/items?$select=InstructorKey,Title,Active&$orderby=Title&$top=5000`);
-    const keys = new Set<string>();
-    return rows.map(row => {
-      const key = string(row.InstructorKey, 'InstructorKey');
-      const name = string(row.Title, 'Title');
-      if (!key.trim() || !name.trim() || keys.has(key) || (row.Active !== undefined && typeof row.Active !== 'boolean')) invalid('The instructor list contains malformed or duplicate entries.');
-      keys.add(key);
-      return { id: key, name, ...(row.Active === undefined ? {} : { active: row.Active as boolean }) };
-    });
-  }
-  public async listReports(): Promise<ReportSummary[]> {
-    const rows = await this.collection(`${this.reportsUrl}/items?$select=Id,Title,InstructorName,FromDate,ToDate,Modified&$orderby=Modified desc&$top=5000`);
+  public async listReports(ownerEmail: string): Promise<ReportSummary[]> {
+    const rows = await this.collection(`${this.reportsUrl}/items?$expand=Author&$filter=Author/EMail%20eq%20'${literal(ownerEmail)}'&$select=Id,Title,InstructorName,FromDate,ToDate,Modified&$orderby=Modified desc&$top=5000`);
     return rows.map(row => ({ id: id(row.Id), title: string(row.Title, 'Title'), instructorName: string(row.InstructorName, 'InstructorName'),
       fromDate: formatDateInput(isoDate(row.FromDate)), toDate: formatDateInput(isoDate(row.ToDate)), modified: string(row.Modified, 'Modified') }));
   }

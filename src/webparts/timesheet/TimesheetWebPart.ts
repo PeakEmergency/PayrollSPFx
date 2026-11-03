@@ -5,7 +5,7 @@ import { type IPropertyPaneConfiguration, PropertyPaneTextField } from '@microso
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import { type IReadonlyTheme } from '@microsoft/sp-component-base';
 import { MSGraphClientV3, SPHttpClient } from '@microsoft/sp-http';
-import { ThemeProvider, createTheme, initializeIcons, type ITheme } from '@fluentui/react';
+import { MessageBar, MessageBarType, Spinner, ThemeProvider, createTheme, initializeIcons, type ITheme } from '@fluentui/react';
 import ExpenseReport from '../../expenseReport/components/ExpenseReport';
 import { SharePointReportService } from '../../expenseReport/services/SharePointReportService';
 
@@ -22,7 +22,6 @@ export interface ITimesheetWebPartProps {
   // Expense report settings (blank uses the defaults below).
   expenseSiteUrl: string;
   reportsListTitle: string;
-  instructorsListTitle: string;
   defaultRate: string;
 }
 
@@ -32,6 +31,9 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
   private _expenseService: SharePointReportService | undefined;
   private _expenseKey = '';
   private _theme: ITheme | undefined;
+  private _userName: string | undefined;
+  private _userNameError = '';
+  private _userNameRequested = false;
 
   protected async onInit(): Promise<void> {
     await super.onInit();
@@ -39,10 +41,21 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
   }
 
   private renderExpenseReport(): React.ReactElement {
+    if (this._userName === undefined) {
+      if (!this._userNameRequested) {
+        this._userNameRequested = true;
+        this.graph.then(getCurrentEmployee).then(
+          name => { this._userName = name; this.render(); },
+          (err: Error) => { this._userNameError = err.message; this.render(); }
+        ).catch(() => undefined);
+      }
+      return this._userNameError
+        ? React.createElement(MessageBar, { messageBarType: MessageBarType.error }, )
+        : React.createElement(Spinner, { label: 'Loading your details…' });
+    }
     const siteUrl = (this.properties.expenseSiteUrl || this.context.pageContext.web.absoluteUrl).replace(/\/$/, '');
     const reportsListTitle = this.properties.reportsListTitle || 'ExpenseReports';
-    const instructorsListTitle = this.properties.instructorsListTitle || 'Instructors';
-    const key = JSON.stringify([siteUrl, reportsListTitle, instructorsListTitle]);
+    const key = JSON.stringify([siteUrl, reportsListTitle]);
     if (!this._expenseService || this._expenseKey !== key) {
       this._expenseService = new SharePointReportService(
         {
@@ -55,7 +68,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
             return response as unknown as Response;
           }
         },
-        { siteUrl, reportsListTitle, instructorsListTitle }
+        { siteUrl, reportsListTitle }
       );
       this._expenseKey = key;
     }
@@ -66,6 +79,8 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
         key,
         service: this._expenseService,
         defaultRate: this.properties.defaultRate || '0.48',
+        user: { key: this.context.pageContext.user.loginName, name: this._userName },
+        userEmail: this.context.pageContext.user.email,
         instanceId: this.instanceId,
         isDarkTheme: this._theme?.isInverted || false
       })
@@ -143,7 +158,6 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
               groupFields: [
                 PropertyPaneTextField('expenseSiteUrl', { label: 'SharePoint site URL', placeholder: this.context.pageContext.web.absoluteUrl }),
                 PropertyPaneTextField('reportsListTitle', { label: 'Reports list', placeholder: 'ExpenseReports' }),
-                PropertyPaneTextField('instructorsListTitle', { label: 'Instructors list', placeholder: 'Instructors' }),
                 PropertyPaneTextField('defaultRate', {
                   label: 'Default mileage rate per km',
                   description: 'New reports only. Saved reports keep their rates.',

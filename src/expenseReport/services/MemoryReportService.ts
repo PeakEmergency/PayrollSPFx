@@ -1,14 +1,11 @@
-import type { ExpenseReport, Instructor, ReceiptInfo, ReportSummary } from '../domain/models';
+import type { ExpenseReport, ReceiptInfo, ReportSummary } from '../domain/models';
 import { ReportServiceError, type IReportService } from './IReportService';
 import { encodeReport, decodeReport } from './reportCodec';
 import { equalReceiptBytes, validateReceiptName } from './SharePointReportService';
 type SavedReport = { payload: string; version: number; modified: string; receipts: { info: ReceiptInfo; bytes: ArrayBuffer }[] };
 export class MemoryReportService implements IReportService {
   private readonly reports = new Map<number, SavedReport>();
-  private readonly instructors: Instructor[];
   private nextId = 1;
-  public constructor(instructors: Instructor[]) { this.instructors = instructors.map(instructor => ({ ...instructor })); }
-  public async getInstructors(): Promise<Instructor[]> { return this.instructors.map(instructor => ({ ...instructor })); }
   private saved(id: number): SavedReport {
     const saved = this.reports.get(id);
     if (!saved) throw new ReportServiceError('The preview report was not found.', 'notFound', 404);

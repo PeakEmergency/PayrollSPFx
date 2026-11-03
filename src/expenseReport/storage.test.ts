@@ -4,10 +4,10 @@ import { encodeReport, decodeReport } from './services/reportCodec';
 import { MemoryReportService } from './services/MemoryReportService';
 import { SharePointReportService, type HttpTransport } from './services/SharePointReportService';
 
-const roster = [{ id: 'instructor-01', name: 'Test Instructor', active: true }];
+const user = { id: 'instructor-01', name: 'Test Instructor' };
 function report(): ExpenseReport {
-  return { schemaVersion: 1, clientId: 'client-one', instructorId: roster[0].id,
-    instructorName: roster[0].name, fromDate: '01/11/26', toDate: '15/11/26',
+  return { schemaVersion: 1, clientId: 'client-one', instructorId: user.id,
+    instructorName: user.name, fromDate: '01/11/26', toDate: '15/11/26',
     lines: Array.from({ length: 13 }, (_, i) => ({ id: `line-${i}`, date: '', startCity: '', endCity: '',
       kilometres: '', rate: '0.48', description: '', gst: '', cost: '' })) };
 }
@@ -50,10 +50,6 @@ class SharePointFixture implements HttpTransport {
       if (decoded.endsWith('/$value')) return this.files.has(fileName!) ? new Response(this.files.get(fileName!)!) : json({}, 404);
       return json({ value: Array.from(this.files.keys(), name => ({ FileName: name, ServerRelativeUrl: `/sites/expense/Lists/ExpenseReports/Attachments/${item.Id}/${name}` })) });
     }
-    if (decoded.includes("getbytitle('Instructors')")) {
-      if (this.page && !decoded.includes('page=2')) return json({ value: [{ InstructorKey: 'a', Title: 'First', Active: true }], 'odata.nextLink': `${url}&page=2` });
-      return json({ value: [{ InstructorKey: 'b', Title: 'Second', Active: true }] });
-    }
     if (itemId) {
       if (!item) return json({}, 404);
       if (method === 'POST') {
@@ -82,7 +78,8 @@ class SharePointFixture implements HttpTransport {
     return json({ value: matches.map(i => ({ ...i, ...(this.omitCollectionEtags ? {} : { 'odata.etag': `"${i.version}"` }) })), ...(this.nextLinkOverride ? { 'odata.nextLink': this.nextLinkOverride } : {}) });
   };
 }
-const config = { siteUrl: 'https://example.sharepoint.com/sites/expense', reportsListTitle: 'ExpenseReports', instructorsListTitle: 'Instructors' };
+const OWNER = 'a@peak.com';
+const config = { siteUrl: 'https://example.sharepoint.com/sites/expense', reportsListTitle: 'ExpenseReports' };
 
 describe('strict report codec', () => {
   it('preserves 13 slots, IDs, blanks, zero, arbitrary decimal precision and rate snapshots with ISO dates', () => {
@@ -185,16 +182,15 @@ describe('SharePoint storage', () => {
     expect(JSON.parse(fixture.items[0].Payload).lines[0].description).toBe('Another editor entry');
     expect(fixture.items).toHaveLength(1);
   });
-  it('paginates instructors and reports using server next links', async () => {
+  it('paginates reports using server next links', async () => {
     const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
     await service.saveReport(report()); await service.saveReport({ ...report(), clientId: 'second' }); fixture.page = true;
-    expect((await service.getInstructors()).map(i => i.name)).toEqual(['First', 'Second']);
-    expect((await service.listReports()).map(i => i.id)).toEqual([1, 2]);
+    expect((await service.listReports(OWNER)).map(i => i.id)).toEqual([1, 2]);
   });
   it('does not substitute preview data for permission or configuration failures', async () => {
     const fixture = new SharePointFixture(); fixture.denied = true;
     const service = new SharePointReportService(fixture, config);
-    await expect(service.getInstructors()).rejects.toMatchObject({ kind: 'permission', status: 403 });
+    await expect(service.listReports(OWNER)).rejects.toMatchObject({ kind: 'permission', status: 403 });
     await expect(service.saveReport(report())).rejects.toMatchObject({ kind: 'permission', status: 403 });
     expect(fixture.items).toHaveLength(0);
     expect(() => new SharePointReportService(fixture, { ...config, reportsListTitle: '' })).toThrow();
@@ -202,9 +198,9 @@ describe('SharePoint storage', () => {
   it('does not follow unsafe or repeated server pagination links', async () => {
     const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
     fixture.nextLinkOverride = 'https://other.example/_api/items';
-    await expect(service.listReports()).rejects.toMatchObject({ kind: 'invalidData' });
+    await expect(service.listReports(OWNER)).rejects.toMatchObject({ kind: 'invalidData' });
     fixture.nextLinkOverride = `${config.siteUrl}/_api/repeated`;
-    await expect(service.listReports()).rejects.toMatchObject({ kind: 'invalidData' });
+    await expect(service.listReports(OWNER)).rejects.toMatchObject({ kind: 'invalidData' });
   });
   it('keeps saved identity through failed receipts and resolves interrupted uploads by comparing bytes', async () => {
     const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
@@ -256,9 +252,20 @@ describe('SharePoint storage', () => {
   });
 });
 
+describe('own reports only', () => {
+  it('filters the list by the signed-in user email', async () => {
+    const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
+    await service.listReports(OWNER);
+    const url = decodeURIComponent(fixture.requests[0].url);
+    expect(fixture.requests[0].url).toContain('$expand=Author');
+    expect(fixture.requests[0].url).toContain("$filter=Author/EMail%20eq%20'a%40peak.com'");
+    expect(url).toContain("Author/EMail eq 'a@peak.com'");
+  });
+});
+
 describe('independent memory preview', () => {
   it('round trips cloned values, enforces ETags and isolates service instances', async () => {
-    const memory = new MemoryReportService(roster); const other = new MemoryReportService(roster);
+    const memory = new MemoryReportService(); const other = new MemoryReportService();
     const original = report(); const saved = await memory.saveReport(original);
     saved.lines[0].description = 'Edit';
     expect((await memory.loadReport(saved.id!)).report.lines[0].description).toBe('');

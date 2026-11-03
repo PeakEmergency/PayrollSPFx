@@ -41,6 +41,10 @@ The package is `sharepoint/solution/peak-timesheets.sppkg`.
    - `Pay Period Schedule`, seeded with the 2026 PP 1 to 2027 PP 26 periods. Rerun `provision-timesheets.js` to create and seed it. Add future years as rows in that list.
 4. Add the app to the site, then add the **Timesheet** web part to a page. Its properties are the recipient email, the list title and the template library URL (leave this blank for `<site>/Timesheet Templates`).
 
+## Expense reports list
+
+The Expense Report button uses the `ExpenseReports` list. Create it by pasting `provisioning/provision-expense-reports.js` into the browser console on `https://peakemergency.sharepoint.com` as a site owner (safe to rerun). It sets item-level security (users read and edit only their own reports), gives site Members Contribute and the `Payroll Owners` group Edit. Each user sees only reports they created, and the name on the report is their signed-in name. The Instructors list is no longer used and can be deleted.
+
 ## Email flow (Power Automate)
 
 `schedule@` is a licensed user mailbox, so the flow's **Office 365 Outlook** connection signs in as `schedule@peakemergencytraining.onmicrosoft.com` and sends as itself; no Send As delegation is needed. The **SharePoint** connections can use any account with Edit on the list.

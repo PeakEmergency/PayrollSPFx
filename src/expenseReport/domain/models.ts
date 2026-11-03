@@ -24,7 +24,6 @@ export interface ExpenseReport {
   lines: ExpenseLine[];
 }
 
-export interface Instructor { id: string; name: string; active?: boolean; }
 export interface ReceiptInfo { name: string; url: string; }
 export interface ReportSummary {
   id: number;

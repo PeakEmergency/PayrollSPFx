@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { DefaultButton, Dropdown, IDropdownOption, MessageBar, MessageBarType, PrimaryButton, Spinner, SpinnerSize, ThemeProvider, createTheme } from '@fluentui/react';
+import { DefaultButton, Dropdown, MessageBar, MessageBarType, PrimaryButton, Spinner, SpinnerSize, ThemeProvider, createTheme } from '@fluentui/react';
 import { IReportService } from '../services/IReportService';
-import { ExpenseLine, ExpenseReport as Report, Instructor, ReceiptInfo, ReportSummary } from '../domain/models';
+import { ExpenseLine, ExpenseReport as Report, ReceiptInfo, ReportSummary } from '../domain/models';
 import { createReport, validateReport } from '../domain/report';
 import ExpenseTable from './ExpenseTable';
 import PayPeriodDateField from './PayPeriodDateField';
@@ -14,6 +14,8 @@ const confirmationStyles = styles as unknown as Record<string, string>;
 export interface IExpenseReportProps {
   service: IReportService;
   defaultRate: string;
+  user: { key: string; name: string };
+  userEmail: string;
   instanceId: string;
   isDarkTheme?: boolean;
   isPreview?: boolean;
@@ -29,9 +31,8 @@ const sameInputs = (left: Report, right: Report): boolean => {
 };
 
 export default function ExpenseReport(props: IExpenseReportProps): React.ReactElement {
-  const [report, setReport] = React.useState<Report>(() => createReport(props.defaultRate));
+  const [report, setReport] = React.useState<Report>(() => createReport(props.defaultRate, props.user));
   const [baseline, setBaseline] = React.useState(() => JSON.stringify(report));
-  const [instructors, setInstructors] = React.useState<Instructor[]>([]);
   const [reports, setReports] = React.useState<ReportSummary[]>([]);
   const [receipts, setReceipts] = React.useState<ReceiptInfo[]>([]);
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
@@ -50,7 +51,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
   const restoreFocusRef = React.useRef<HTMLElement | null>(null);
   const [reload, setReload] = React.useState(0);
   const summary = React.useRef<HTMLDivElement>(null);
-  const issues = showValidation ? validateReport(report, instructors) : [];
+  const issues = showValidation ? validateReport(report) : [];
   const dirty = baseline !== JSON.stringify(report) || pendingFiles.length > 0 || saveUncertain;
   const locked = !!busy;
   const setOperationBusy = (phase?: 'saving' | 'opening'): void => {
@@ -67,12 +68,9 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
   React.useEffect(() => {
     let active = true;
     setLoading(true); setLoadError(''); setListError('');
-    const roster = props.service.getInstructors().then(items => {
-      if (active) { setInstructors(items); if (!items.length) setLoadError('No instructors are configured. Ask your site administrator to add the instructor roster.'); }
-    }).catch(error => { if (active) { setInstructors([]); setLoadError(errorText(error)); } });
-    const list = props.service.listReports().then(items => { if (active) setReports(items); })
+    const list = props.service.listReports(props.userEmail).then(items => { if (active) setReports(items); })
       .catch(error => { if (active) setListError(errorText(error)); });
-    Promise.all([roster, list]).then(() => { if (active) setLoading(false); }).catch(() => undefined);
+    list.then(() => { if (active) setLoading(false); }).catch(() => undefined);
     return () => { active = false; };
   }, [props.service, reload]);
 
@@ -104,13 +102,13 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     setStatus('');
   };
   const refreshList = async (): Promise<void> => {
-    try { setReports(await props.service.listReports()); setListError(''); }
+    try { setReports(await props.service.listReports(props.userEmail)); setListError(''); }
     catch (error) { setListError(`Saved reports could not be refreshed: ${errorText(error)}`); }
   };
   const save = async (): Promise<void> => {
     if (busyRef.current || loading || loadError) return;
     setShowValidation(true); setStatus(''); setOperationError('');
-    if (validateReport(report, instructors).length) { summary.current?.focus(); return; }
+    if (validateReport(report).length) { summary.current?.focus(); return; }
     setOperationBusy('saving');
     try {
       const saved = report.id !== undefined && pendingFiles.length > 0 && JSON.stringify(report) === baseline
@@ -151,7 +149,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     if (busyRef.current) return;
     setPendingAction(undefined);
     if (action.type === 'new') {
-      const blank = createReport(props.defaultRate);
+      const blank = createReport(props.defaultRate, props.user);
       setReport(blank); setBaseline(JSON.stringify(blank)); setReceipts([]); setPendingFiles([]); setSaveUncertain(false);
       setSelectedReportId(undefined); setShowValidation(false); setOperationError(''); setStatus('');
       return;
@@ -169,11 +167,6 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     if (busyRef.current) return;
     if (dirty) setPendingAction(action); else performAction(action).catch(error => setOperationError(errorText(error)));
   };
-  const options: IDropdownOption[] = instructors.filter(person => person.active !== false || person.id === report.instructorId)
-    .map(person => ({ key: person.id, text: person.id === report.instructorId ? report.instructorName : person.name }));
-  if (report.instructorId && !options.some(option => option.key === report.instructorId)) {
-    options.push({ key: report.instructorId, text: report.instructorName, disabled: true });
-  }
   const issue = (field: string): string | undefined => issues.find(item => item.field === field)?.message;
 
   return <ThemeProvider theme={props.isDarkTheme ? darkTheme : undefined} className={`${styles.expenseReport} ${props.isDarkTheme ? styles.dark : ''}`}>
@@ -184,14 +177,8 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
         <img className={styles.logo} src={peakLogo} alt="Peak paramedic services" />
       </div>
       <div className={styles.reportHeader}>
-        <Dropdown id={`${props.instanceId}-instructor`} label="Instructor" className={styles.instructor}
-          placeholder="PICK FROM DROPDOWN" selectedKey={report.instructorId || null} options={options}
-          disabled={loading || locked || !instructors.length} required errorMessage={issue('instructorId')}
-          onChange={(_, option) => {
-            if (busyRef.current || !option) return;
-            const selected = instructors.find(person => person.id === option.key && person.active !== false);
-            if (selected) { setReport(current => ({ ...current, instructorId: selected.id, instructorName: selected.name })); setStatus(''); }
-          }} />
+        <div className={styles.instructor}><div>Instructor</div><strong style={{ fontSize: 24 }}>{report.instructorName || '—'}</strong>
+          {issue('instructorId') && <div role="alert" style={{ color: '#a4262c' }}>{issue('instructorId')}</div>}</div>
         <div className={styles.printInstructor}><span>Instructor</span><strong>{report.instructorName || '—'}</strong></div>
         <section className={styles.payPeriod} aria-labelledby={`${props.instanceId}-pay-period`}>
           <h2 id={`${props.instanceId}-pay-period`}>PAY PERIOD</h2>
@@ -204,7 +191,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
         </section>
       </div>
       <div className={styles.noPrint}>
-        {loading && <Spinner size={SpinnerSize.small} label="Loading instructors and saved reports…" />}
+        {loading && <Spinner size={SpinnerSize.small} label="Loading saved reports…" />}
         {(loadError || listError) && <MessageBar messageBarType={MessageBarType.error} isMultiline>
           {loadError && <p>{loadError}</p>}{listError && <p>{listError}</p>}
           <DefaultButton text="Retry loading" disabled={locked || loading} onClick={() => setReload(value => value + 1)} />

@@ -1,4 +1,4 @@
-import type { ExpenseReport, Instructor, ValidationIssue } from './models';
+import type { ExpenseReport, ValidationIssue } from './models';
 import { parseDateInput } from './dates';
 import { isNumericInput } from './calculations';
 
@@ -12,20 +12,19 @@ function newIdentity(): string {
   return Date.now().toString(36) + '-' + identitySequence.toString(36) + '-' + Math.random().toString(36).slice(2);
 }
 
-export function createReport(rate: string = '0.48'): ExpenseReport {
+export function createReport(rate: string = '0.48', user: { key: string; name: string } = { key: '', name: '' }): ExpenseReport {
   return {
-    schemaVersion: 1, clientId: newIdentity(), instructorId: '', instructorName: '', fromDate: '', toDate: '',
+    schemaVersion: 1, clientId: newIdentity(), instructorId: user.key, instructorName: user.name, fromDate: '', toDate: '',
     lines: Array.from({ length: EXPENSE_LINE_COUNT }, () => ({
       id: newIdentity(), date: '', startCity: '', endCity: '', kilometres: '', rate, description: '', gst: '', cost: ''
     }))
   };
 }
 
-export function validateReport(report: ExpenseReport, instructors: Instructor[]): ValidationIssue[] {
+export function validateReport(report: ExpenseReport): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  const name = report.instructorName.trim();
-  if (!name || name.toUpperCase() === 'PICK FROM DROPDOWN' || !instructors.some(instructor => instructor.id === report.instructorId)) {
-    issues.push({ field: 'instructorId', message: 'Your name must be picked from the instructor dropdown list.' });
+  if (!report.instructorName.trim()) {
+    issues.push({ field: 'instructorId', message: "Your name couldn't be loaded. Refresh the page." });
   }
   const from = parseDateInput(report.fromDate);
   const to = parseDateInput(report.toDate);

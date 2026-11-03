@@ -1,8 +1,7 @@
-import type { ExpenseReport, Instructor, ReceiptInfo, ReportSummary } from '../domain/models';
+import type { ExpenseReport, ReceiptInfo, ReportSummary } from '../domain/models';
 
 export interface IReportService {
-  getInstructors(): Promise<Instructor[]>;
-  listReports(): Promise<ReportSummary[]>;
+  listReports(ownerEmail: string): Promise<ReportSummary[]>;
   loadReport(id: number): Promise<{ report: ExpenseReport; receipts: ReceiptInfo[] }>;
   saveReport(report: ExpenseReport): Promise<ExpenseReport>;
   uploadReceipt(reportId: number, file: File): Promise<ReceiptInfo>;
