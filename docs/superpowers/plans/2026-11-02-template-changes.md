@@ -407,7 +407,7 @@ it('leaves an empty row alone', () => expect(fillDefaultRate('Admin', {}, 30).ra
 - [x] **Step 3:** Implement `rates.ts` and the source. The grid calls `fillDefaultRate` in `onchange` and writes the value back with `setValueFromCoords`. A PSL value must be one of the column's `options`, or it is ignored.
 - [x] **Step 4:** The form loads the rates once. If there is no row for the current form type, show `No pay rate is set up for you on this timesheet. Contact accounts.` and disable Submit.
 - [x] **Step 5:** Provisioning: create `Pay Rates` with the fields above, with item-level read security so each person sees only their own row, and Payroll Owners has Edit. Fill the rows from jeff's list.
-- [ ] **Step 6:** Run `npm test`, expect PASS. Do a manual check: a medic with a PCP level gets `Medic – Level PCP(PSL 9)` on each new row and can change it per shift. Commit: `feat: rates fill from the Pay Rates list`.
+- [x] **Step 6:** Run `npm test`, expect PASS (180 passed, 2026-11-03). Manual check still to do in the workbench: a medic with a PCP level gets `Medic – Level PCP(PSL 9)` on each new row and can change it per shift. Commit: `feat: rates fill from the Pay Rates list`.
 
 ### Task 12: Excel templates use the PEAK-only logo (added by Walter mid-run; run right after Task 7)
 
