@@ -1,7 +1,7 @@
 import type * as ExcelJSType from 'exceljs';
 import { computeLine, computeTotals } from '../timesheet/calc';
 import { TEMPLATES } from '../timesheet/definitions';
-import { Line, TimesheetData } from '../timesheet/types';
+import { Line, TemplateDef, TimesheetData } from '../timesheet/types';
 import { normalizeDate, parseTime, timeToDayFraction, toExcelDate } from '../timesheet/values';
 
 /**
@@ -14,14 +14,43 @@ async function loadExcelJs(): Promise<typeof ExcelJSType> {
   return mod.default || mod;
 }
 
-/** Medic formula corrections from the spec (Global Constraints); written as plain formulas over the shared ones. */
-function fixMedicFormulas(ws: ExcelJSType.Worksheet, firstRow: number, lastRow: number): void {
-  for (let r = firstRow; r <= lastRow; r++) {
-    ws.getCell(`H${r}`).value = { formula: `G${r}` } as ExcelJSType.CellFormulaValue;
-    ws.getCell(`F${r}`).value = { formula: `MOD(E${r}-D${r},1)*24` } as ExcelJSType.CellFormulaValue;
+/** Writes the column headings from the definitions into the template header row, keeping cell styles. */
+export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
+  def.columns.forEach((c) => {
+    const cell = ws.getCell(`${c.col}${def.headerRow}`);
+    cell.value = c.header;
+    if (c.header.indexOf('\n') >= 0) cell.alignment = { ...cell.alignment, wrapText: true };
+  });
+  if (def.type === 'Medic') {
+    // DAYS is an input in F, so the hours formulas go; start/end columns D:E are hidden (F4:G4 'From:' stays visible).
+    ['D', 'E'].forEach((c) => {
+      ws.getCell(`${c}${def.headerRow}`).value = null;
+      ws.getColumn(c).hidden = true;
+    });
+    for (let r = def.firstRow; r < def.firstRow + def.rowCount; r++) {
+      ws.getCell(`F${r}`).value = null;
+    }
+    ws.getCell('K20').value = { formula: 'SUM(I20:J20)' } as ExcelJSType.CellFormulaValue;
+    ws.getCell('J22').value = { formula: 'SUM(J8:J20)' } as ExcelJSType.CellFormulaValue;
   }
-  ws.getCell('K20').value = { formula: 'SUM(I20:J20)' } as ExcelJSType.CellFormulaValue;
-  ws.getCell('J22').value = { formula: 'SUM(J8:J20)' } as ExcelJSType.CellFormulaValue;
+  // PSL cells hold the level text; a hidden table maps it back to the amount, and the line total looks it up.
+  const validations = (ws as unknown as { dataValidations: { model: Record<string, unknown> } }).dataValidations.model;
+  def.columns.forEach((c) => {
+    const t = c.levelTable;
+    if (!t) return;
+    (c.options || []).forEach((amount, i) => {
+      ws.getCell(`${t.labelCol}${t.firstRow + i}`).value = c.optionLabels![i];
+      ws.getCell(`${t.amountCol}${t.firstRow + i}`).value = amount;
+    });
+    const range = `$${t.labelCol}$${t.firstRow}:$${t.amountCol}$${t.firstRow + (c.options || []).length - 1}`;
+    const lookup = (r: number): string => `VLOOKUP(${c.col}${r},${range},2,FALSE)`;
+    for (let r = def.firstRow; r < def.firstRow + def.rowCount; r++) {
+      const amount = `${def.type === 'Medic' ? 'F' : 'D'}${r}*${lookup(r)}`;
+      const formula = `IF(${c.col}${r}="",0,${amount})`; // blank PSL gives 0, a bad label still errors
+      ws.getCell(`${def.type === 'Medic' ? 'H' : 'F'}${r}`).value = { formula } as ExcelJSType.CellFormulaValue;
+      delete validations[`${c.col}${r}`]; // the template list holds amounts and would reject the label
+    }
+  });
 }
 
 /** Fills a copy of the stored template. Only cell values change; styles and formats stay. */
@@ -31,6 +60,7 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(template);
   const ws = wb.getWorksheet(def.sheetName)!;
+  applyLayout(ws, def);
 
   ws.getCell(def.nameCell).value = data.name;
   if (data.from) ws.getCell(def.fromCell).value = toExcelDate(data.from);
@@ -51,12 +81,12 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
         cell.value = String(raw).toUpperCase();
       } else {
         const n = Number(raw);
-        if (!isNaN(n)) cell.value = n;
+        const at = c.levelTable ? (c.options || []).indexOf(n) : -1;
+        if (at >= 0) cell.value = c.optionLabels![at];
+        else if (!isNaN(n)) cell.value = n;
       }
     });
   });
-
-  if (data.type === 'Medic') fixMedicFormulas(ws, def.firstRow, def.firstRow + def.rowCount - 1);
 
   // Cached results, so previewers that don't recalculate (Outlook, phones) show real totals.
   const setResult = (address: string, result: Line[string] | undefined): void => {

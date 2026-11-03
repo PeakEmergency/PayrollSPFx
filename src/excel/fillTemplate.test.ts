@@ -24,7 +24,7 @@ async function fill(type: TimesheetType, lines: Line[]): Promise<ExcelJS.Workshe
   return load(await fillTemplate(toArrayBuffer(fixture(type)), data), type);
 }
 
-const line: Line = { date: '2026-10-15', client: 'acme', start: '06:00', end: '18:00', dayRate: 450, travel: 100, perDiem: 47 };
+const line: Line = { date: '2026-10-15', client: 'acme', days: 1, dayRate: 450, travel: 100, perDiem: 47 };
 
 it('fillTemplate writes header', async () => {
   const ws = await fill('Medic', [line]);
@@ -47,12 +47,15 @@ it('fillTemplate keeps row positions', async () => {
   ['C9', 'C10', 'C11'].forEach((a) => expect(ws.getCell(a).value).toBeNull());
 });
 
-it('medic formula fixes', async () => {
+it('medic writes DAYS in F and hides D:E', async () => {
   const ws = await fill('Medic', [line]);
-  expect(ws.getCell('H8').formula).toBe('G8');
-  expect(ws.getCell('H19').formula).toBe('G19');
-  expect(ws.getCell('F8').formula).toBe('MOD(E8-D8,1)*24');
-  expect(ws.getCell('F20').formula).toBe('MOD(E20-D20,1)*24');
+  expect(ws.getCell('F8').value).toBe(1);
+  expect(ws.getCell('F7').value).toBe('DAYS');
+  expect(ws.getColumn('D').hidden && ws.getColumn('E').hidden).toBe(true);
+  expect(ws.getCell('F22').formula).toBe('SUM(F8:F20)');
+  expect(ws.getCell('F9').formula).toBeFalsy();
+  expect(ws.getCell('H8').formula).toBe('IF(G8="",0,F8*VLOOKUP(G8,$M$6:$N$9,2,FALSE))');
+  expect(ws.getCell('H19').formula).toBe('IF(G19="",0,F19*VLOOKUP(G19,$M$6:$N$9,2,FALSE))');
   expect(ws.getCell('K20').formula).toBe('SUM(I20:J20)');
   expect(ws.getCell('J22').formula).toBe('SUM(J8:J20)');
 });
@@ -68,16 +71,11 @@ it('other templates untouched', async () => {
     const original = await load(fixture(type), type);
     // Hidden columns compare as 'hidden': ExcelJS round-trips some hidden width-0 ranges as width 9.
     const widths = (ws: ExcelJS.Worksheet): (number | string | undefined)[] => ws.columns.map((c) => (c.hidden ? 'hidden' : c.width));
-    expect(widths(filled)).toEqual(widths(original));
+    const expected = widths(original);
+    if (type === 'Medic') expected[3] = expected[4] = 'hidden'; // layout hides D:E (start/end)
+    expect(widths(filled)).toEqual(expected);
   }
 }, 60000); // loads and writes 8 workbooks
-
-it('times written as day fractions', async () => {
-  const ws = await fill('Medic', [line]);
-  // ExcelJS reads time-formatted numbers back as Dates on the 1899-12-30 epoch.
-  const serial = ((ws.getCell('D8').value as Date).getTime() - Date.UTC(1899, 11, 30)) / 86400000;
-  expect(serial).toBe(0.25);
-});
 
 it('uppercase', async () => {
   const ws = await fill('Medic', [line]);
@@ -87,11 +85,47 @@ it('uppercase', async () => {
 it('formula cells carry computed results for previewers that do not recalculate', async () => {
   const ws = await fill('Medic', [line]);
   const result = (a: string): unknown => (ws.getCell(a).value as { result?: unknown }).result;
-  expect(result('F8')).toBe(12);
   expect(result('H8')).toBe(450);
   expect(result('K8')).toBe(147);
   expect(result('L8')).toBe(597);
-  expect(result('F22')).toBe(12);
+  expect(result('F22')).toBe(1);
   expect(result('J22')).toBe(47);
   expect(result('L22')).toBe(597);
+});
+
+it('applyLayout writes the new headings', async () => {
+  const admin = await fill('Admin', [{}]);
+  expect(admin.getCell('F6').value).toBe('TOTAL\nHOURS');
+  expect(admin.getCell('G6').value).toBe('PAY\nRATE');
+  expect(admin.getCell('F6').alignment?.wrapText).toBe(true);
+  const instr = await fill('Instructor', [{}]);
+  expect(instr.getCell('D7').value).toBe('DAYS');
+  expect(instr.getCell('E7').value).toBe('PAY SCALE LEVEL (PSL)');
+});
+
+it('instructor PSL cell shows the level and the total looks it up', async () => {
+  const ws = await fill('Instructor', [{ date: '2026-10-15', course: 'A1', days: 1, dayRate: 225 }]);
+  expect(ws.getCell('E8').value).toBe('Instructor – Level 1 (PSL 3)');
+  expect(ws.getCell('F8').formula).toBe('IF(E8="",0,D8*VLOOKUP(E8,$N$8:$O$14,2,FALSE))');
+  expect(ws.getCell('N10').value).toBe('Instructor – Level 1 (PSL 3)');
+  expect(ws.getCell('O10').value).toBe(225);
+  expect((ws.getCell('F8').value as { result?: number }).result).toBe(225);
+});
+
+it('medic PSL cell shows the level', async () => {
+  const ws = await fill('Medic', [{ date: '2026-10-15', client: 'X', days: 0.5, dayRate: 350 }]);
+  expect(ws.getCell('G8').value).toBe('Medic – Level PCP(PSL 9)');
+  expect(ws.getCell('H8').formula).toBe('IF(G8="",0,F8*VLOOKUP(G8,$M$6:$N$9,2,FALSE))');
+  expect((ws.getCell('H8').value as { result?: number }).result).toBe(175);
+});
+
+it('blank grid rows use the guarded lookup and cache 0, not an error', async () => {
+  const i = await fill('Instructor', [{ date: '2026-10-15', course: 'A1', days: 1, dayRate: 225 }]);
+  expect(i.getCell('F9').formula).toBe('IF(E9="",0,D9*VLOOKUP(E9,$N$8:$O$14,2,FALSE))');
+  expect((i.getCell('F9').value as { result?: number }).result || 0).toBe(0);
+  expect((i as unknown as { dataValidations: { model: Record<string, unknown> } }).dataValidations.model.E8).toBeUndefined();
+  const m = await fill('Medic', [{ date: '2026-10-15', client: 'X', days: 0.5, dayRate: 350 }]);
+  expect(m.getCell('H9').formula).toBe('IF(G9="",0,F9*VLOOKUP(G9,$M$6:$N$9,2,FALSE))');
+  expect((m.getCell('H9').value as { result?: number }).result || 0).toBe(0);
+  expect((m as unknown as { dataValidations: { model: Record<string, unknown> } }).dataValidations.model.G8).toBeUndefined();
 });

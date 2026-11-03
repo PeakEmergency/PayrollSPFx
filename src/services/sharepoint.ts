@@ -1,7 +1,12 @@
 import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
 import { TEMPLATES } from '../timesheet/definitions';
+import { PayPeriod, toPayPeriod } from '../timesheet/payPeriods';
+import { PayRates, toPayRates } from '../timesheet/rates';
 import { TimesheetType } from '../timesheet/types';
 import { SubmissionRecord, SubmissionStatus, SubmissionStore, TemplateSource } from './submit';
+
+export const PAY_PERIOD_LIST = 'Pay Period Schedule';
+export const PAY_RATE_LIST = 'Pay Rates';
 
 const jsonHeaders = {
   Accept: 'application/json;odata=nometadata',
@@ -100,5 +105,44 @@ export class SpTemplateSource implements TemplateSource {
       )
     );
     return res.arrayBuffer();
+  }
+}
+
+export class SpPayPeriodSource {
+  private readonly itemsUrl: string;
+
+  public constructor(private readonly client: SPHttpClient, webUrl: string, listTitle: string) {
+    this.itemsUrl = `${webUrl}/_api/web/lists/getbytitle('${odataString(listTitle)}')/items`;
+  }
+
+  public async getPayPeriods(): Promise<PayPeriod[]> {
+    const res = await check(
+      'Loading pay periods',
+      this.client.get(`${this.itemsUrl}?$select=Year,PeriodNumber,FromDate,ToDate&$top=5000`, SPHttpClient.configurations.v1, {
+        headers: { Accept: 'application/json;odata=nometadata' }
+      })
+    );
+    return (await res.json()).value.map(toPayPeriod);
+  }
+}
+
+export class SpPayRateSource {
+  private readonly itemsUrl: string;
+
+  public constructor(private readonly client: SPHttpClient, webUrl: string, listTitle: string) {
+    this.itemsUrl = `${webUrl}/_api/web/lists/getbytitle('${odataString(listTitle)}')/items`;
+  }
+
+  /** The signed-in person's row, or undefined if they have none (item permissions hide everyone else's). */
+  public async getMyRates(userId: number): Promise<PayRates | undefined> {
+    const select = 'AdminRate,MedicPSL,RateAP,RateASU,RateNUECAFull,RateNUECABridging,RateNUECI,RateNUECB';
+    const res = await check(
+      'Loading your pay rates',
+      this.client.get(`${this.itemsUrl}?$select=${select}&$filter=EmployeeId eq ${userId}&$top=1`, SPHttpClient.configurations.v1, {
+        headers: { Accept: 'application/json;odata=nometadata' }
+      })
+    );
+    const [row] = (await res.json()).value;
+    return row ? toPayRates(row) : undefined;
   }
 }

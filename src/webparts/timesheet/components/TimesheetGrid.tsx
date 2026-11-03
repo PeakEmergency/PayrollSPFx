@@ -5,10 +5,13 @@ import 'jspreadsheet-ce/dist/jspreadsheet.css';
 import { computeLine } from '../../../timesheet/calc';
 import { ColumnDef, Line, TemplateDef } from '../../../timesheet/types';
 import { normalizeDate, parseTime } from '../../../timesheet/values';
+import { fillRate, PayRates, RATE_KEY } from '../../../timesheet/rates';
 
 export interface ITimesheetGridProps {
   def: TemplateDef;
   lines: Line[];
+  /** Fills each row's rate as the user types; undefined while loading or if the person has none. */
+  rates?: PayRates;
   onChange(lines: Line[]): void;
 }
 
@@ -93,10 +96,12 @@ const toRow = (cols: ColumnDef[], line: Line | undefined): jspreadsheet.CellValu
   });
 
 /** Vanilla Jspreadsheet CE in a ref; fixed rows, one column per template column. */
-export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridProps): React.ReactElement {
+export default function TimesheetGrid({ def, lines, rates, onChange }: ITimesheetGridProps): React.ReactElement {
   const host = React.useRef<HTMLDivElement>(null);
   const onChangeRef = React.useRef(onChange);
   onChangeRef.current = onChange;
+  const ratesRef = React.useRef(rates);
+  ratesRef.current = rates;
 
   React.useEffect(() => {
     const el = host.current!;
@@ -126,7 +131,7 @@ export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridPr
           columns: cols.map(toColumn),
           nestedHeaders: def.groups ? nestedHeaders(def, cols) : undefined,
           minDimensions: [cols.length, def.rowCount],
-          defaultRowHeight: 37, // template rows are 27.95pt
+          defaultRowHeight: 36, // matches the Expense Report rows
           allowInsertRow: false,
           allowManualInsertRow: false,
           allowDeleteRow: false,
@@ -149,6 +154,17 @@ export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridPr
           instance.setValueFromCoords(Number(colIndex), Number(rowIndex), fixed);
           updating = false;
         }
+        const rateX = cols.findIndex((col) => col.key === RATE_KEY[def.type]);
+        if (ratesRef.current && rateX >= 0) {
+          const y = Number(rowIndex);
+          const line = toLine(cols, (instance.getData() as jspreadsheet.CellValue[][])[y]);
+          const filled = fillRate(def.type, line, ratesRef.current, c.key);
+          if (filled[RATE_KEY[def.type]] !== line[RATE_KEY[def.type]]) {
+            updating = true;
+            instance.setValueFromCoords(rateX, y, filled[RATE_KEY[def.type]] as number);
+            updating = false;
+          }
+        }
         sync(instance);
       }
     });
@@ -160,14 +176,14 @@ export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridPr
     const titles = headRows[headRows.length - 1];
     cols.forEach((c, x) => {
       const td = titles.querySelector<HTMLElement>(`td[data-x="${x}"]`);
-      if (td) td.style.background = groupOf(def, c)?.fill || '#f2f2f2';
+      if (td) td.style.background = groupOf(def, c)?.fill || '#f1f1f1';
     });
     if (def.groups && headRows.length > 1) {
       // First cell is the corner above the row numbers.
       const groupCells = Array.from(headRows[0].querySelectorAll<HTMLElement>('td')).slice(1);
       groupCells.forEach((td) => {
         const g = (def.groups || []).find((x) => x.title === td.textContent?.trim());
-        td.style.background = g ? g.fill : '#f2f2f2';
+        td.style.background = g ? g.fill : '#f1f1f1';
       });
     }
 

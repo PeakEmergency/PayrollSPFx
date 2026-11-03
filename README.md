@@ -38,7 +38,13 @@ The package is `sharepoint/solution/peak-timesheets.sppkg`.
 3. Provision the list and the template library on the site that hosts the web part. Open any page of that site as a site owner, press F12, and paste `provisioning/provision-timesheets.js` into the console (set `ACCOUNTS_GROUP` at the top first). It uses SharePoint REST with your browser login, and is safe to rerun. It creates:
    - `Timesheet Submissions`, with attachments on and item-level security (users read and edit only their own items). The site Members group gets **Contribute** on this list, not Edit, because Edit includes *Manage Lists*, which bypasses item-level security. The accounts group (a SharePoint group) gets **Edit**, so it sees all items. People who submit timesheets must be site Members.
    - `Timesheet Templates`. Upload the three `.xlsx` files from `Templates/xlsx` into it. The script prints the library URL; put it in the web part's template library property if it is not `<site>/Timesheet Templates`.
+   - `Pay Period Schedule`, seeded with the 2026 PP 1 to 2027 PP 26 periods. Rerun `provision-timesheets.js` to create and seed it. Add future years as rows in that list.
+   - `Pay Rates`, seeded with the 29 staff from `docs/Staff PSL.pdf` (Instructor PSL, the six course rates AP, ASU, NUEC-A Full, NUEC-A Bridging, NUEC-I, NUEC-B, and Medic PSL) and the three hourly admin staff (Admin Rate). Salaried staff have no Admin Rate and don't submit admin timesheets. The timesheet fills each row's rate from the signed-in person's row: Admin Rate, the Medic PSL amount, or the instructor rate for the course type read from the course # (`AP-…`, `ASU-…`, `NUEC-A-…F`, `NUEC-A-…B`, `NUEC-I-…`, `NUEC-B-…`). A course # in any other format can't be submitted. Someone with no rate for a form sees "No pay rate is set up for you on this timesheet" and can't submit. The script matches each name to an account by display name. Names it can't match are logged as warnings; set their **Employee** by hand and rerun the script. Each row is readable only by its Employee, the accounts group (Edit) and site owners, so staff can't see each other's rates or change their own. Accounts keeps the rates up to date in that list.
 4. Add the app to the site, then add the **Timesheet** web part to a page. Its properties are the recipient email, the list title and the template library URL (leave this blank for `<site>/Timesheet Templates`).
+
+## Expense reports list
+
+The Expense Report button uses the `ExpenseReports` list. Create it by pasting `provisioning/provision-expense-reports.js` into the browser console on `https://peakemergency.sharepoint.com` as a site owner (safe to rerun). It sets item-level security (users read and edit only their own reports), gives site Members Contribute and the `Payroll Owners` group Edit. Each user sees only reports they created, and the name on the report is their signed-in name. The Instructors list is no longer used and can be deleted.
 
 ## Email flow (Power Automate)
 
@@ -65,3 +71,7 @@ The web part writes values into fixed cells (see section 6 of the spec and `src/
 2. Run `pwsh scripts/Convert-Templates.ps1`. It strips the macros and writes `Templates/xlsx/<Type> Timesheet Template.xlsx`.
 3. Run `npm test`. The definitions test fails if headers or formula cells have moved.
 4. Replace the file in the `Timesheet Templates` library, keeping the same name.
+
+## Updating the template logo
+
+Run `powershell -File scripts/Update-TemplateLogo.ps1`. It puts `src/webparts/timesheet/assets/peak-logo.jpg` into the three `Templates/xlsx` files, uncropped, at the logo's aspect ratio. After updating, re-upload the three files in `Templates/xlsx` to the Timesheet Templates library.

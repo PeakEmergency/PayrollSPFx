@@ -1,0 +1,6 @@
+{
+  "extends": "@microsoft/spfx-web-build-rig/profiles/default/config/jest.config.json",
+
+  // No test needs a DOM, and the expense report storage tests need Node's fetch Response and File.
+  "testEnvironment": "jest-environment-node"
+}

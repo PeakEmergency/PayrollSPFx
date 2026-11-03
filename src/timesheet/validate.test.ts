@@ -20,7 +20,19 @@ it('To before From', () => {
 
 it('invalid time is reported with its row', () => {
   const lines: Line[] = [{}, {}, { date: '2026-10-15', start: 'abc' }];
-  expect(validate({ ...base, lines })).toContain('Row 3: "abc" is not a valid time.');
+  expect(validate({ ...base, type: 'Admin', lines })).toContain('Row 3: "abc" is not a valid time.');
+});
+
+it('instructor course # must match a course type', () => {
+  const lines = [{ date: '2026-10-15', course: 'ABC-1', days: 1, dayRate: 225 }, { date: '2026-10-16', course: 'NUEC-A-443F', days: 1, dayRate: 150 }];
+  const errors = validate({ ...base, type: 'Instructor', lines });
+  expect(errors).toContain('Row 1: course # "ABC-1" doesn\'t match a course type. Use the course # from the course title, for example AP-I-0182, ASU-AB-998, NUEC-A-443F, NUEC-A-468B, NUEC-I-195 or NUEC-B-238.');
+  expect(errors.filter((e) => e.indexOf('Row 2') === 0)).toEqual([]);
+});
+
+it('instructor rate needs a course #', () => {
+  const lines = [{ date: '2026-10-15', days: 1, dayRate: 225 }];
+  expect(validate({ ...base, type: 'Instructor', lines })).toContain('Row 1: course # missing.');
 });
 
 it('admin end before start', () => {
@@ -41,3 +53,9 @@ it('invalid pay rate is reported with its row', () => {
   const lines = [{ date: '2026-10-15', start: '08:00', end: '16:00', rate: '$25' }];
   expect(validate({ ...base, type: 'Admin', lines })).toContain('Row 1: "$25" is not a valid number.');
 });
+
+it('medic row with a PSL but no days', () =>
+  expect(validate({ ...base, from: '2026-11-05', to: '2026-11-18', lines: [{ date: '2026-11-05', dayRate: 350 }] })).toContain('Row 1: days missing.'));
+
+it('instructor row with a PSL but no days', () =>
+  expect(validate({ ...base, type: 'Instructor', from: '2026-11-05', to: '2026-11-18', lines: [{ date: '2026-11-05', dayRate: 280 }] })).toContain('Row 1: days missing.'));

@@ -5,6 +5,8 @@ import { ColumnDef, ColumnKind, TemplateDef, TimesheetType } from './types';
 const col = (key: string, c: string, header: string, kind: ColumnKind, excelWidth: number, options?: number[]): ColumnDef =>
   ({ key, col: c, header, kind, width: Math.round(excelWidth * 7), options });
 
+const perDiem = { options: [47, 23.5], optionLabels: ['One day ($47.00)', 'Half day ($23.50)'] };
+
 const quarterHours: number[] = Array.from({ length: 32 }, (_, i) => (i + 1) * 0.25);
 
 export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
@@ -22,10 +24,10 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
     columns: [
       col('date', 'A', 'DATE', 'date', 10.71),
       col('start', 'C', 'START TIME', 'time', 10.71),
-      col('end', 'D', 'END TIME', 'time', 10.71),
+      col('end', 'D', 'END\nTIME','time', 10.71), // client asked for END stacked over TIME
       col('deductions', 'E', 'DEDUCTIONS', 'dropdown', 15.71, [0, 0.5, 1, 1.25, 1.5, 1.75, 2]),
-      col('hours', 'F', 'TOTAL HOURS(s)', 'computed', 10.14),
-      col('rate', 'G', 'PAY RATE', 'number', 14.14),
+      col('hours', 'F', 'TOTAL\nHOURS', 'computed', 10.14),
+      col('rate', 'G', 'PAY\nRATE', 'number', 14.14),
       col('amount', 'I', 'AMOUNT', 'computed', 15)
     ],
     totals: [
@@ -49,10 +51,11 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
     columns: [
       col('date', 'A', 'DATE', 'date', 10.71),
       col('course', 'C', 'COURSE #', 'upper', 14.29),
-      col('days', 'D', 'DAY(s)', 'dropdown', 14.29, [0.5, 1]),
+      col('days', 'D', 'DAYS', 'dropdown', 14.29, [0.5, 1]),
       {
-        ...col('dayRate', 'E', 'RATE', 'dropdown', 14.29, [0, 150, 225, 280, 320, 340, 350]),
+        ...col('dayRate', 'E', 'PAY SCALE LEVEL (PSL)', 'dropdown', 14.29, [0, 150, 225, 280, 320, 340, 350]),
         // Classifications from Peak Emergency (the template has only the amounts, XFC2:XFC8).
+        levelTable: { labelCol: 'N', amountCol: 'O', firstRow: 8 },
         optionLabels: [
           'Instructor – Level Candidate (PSL 1)',
           'Instructor – Level Mentee (PSL 2)',
@@ -68,7 +71,7 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       col('adminRate', 'H', 'RATE', 'dropdown', 14.29, [25]),
       col('adminTotal', 'I', 'TOTAL', 'computed', 1.14),
       col('travel', 'J', 'TRAVEL TIME', 'dropdown', 14.29, [100]),
-      col('perDiem', 'K', 'PER DIEM', 'dropdown', 14.29, [47]),
+      { ...col('perDiem', 'K', 'PER DIEM', 'dropdown', 14.29), ...perDiem },
       col('otherTotal', 'L', 'TOTAL', 'computed', 1.14),
       col('amount', 'M', 'AMOUNT', 'computed', 13.29)
     ],
@@ -100,12 +103,10 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
     columns: [
       col('date', 'A', 'DATE', 'date', 10.71),
       col('client', 'C', 'CLIENT', 'upper', 30.71),
-      col('start', 'D', 'TIME START', 'time', 10.71),
-      col('end', 'E', 'TIME END', 'time', 10.71),
-      col('hours', 'F', 'HOURS(s)', 'computed', 10.71),
+      col('days', 'F', 'DAYS', 'dropdown', 10.71, [0.5, 1]),
       {
-        ...col('dayRate', 'G', 'RATE', 'dropdown', 10, [250, 350, 450, 550]),
-        // Template lookup table M6:N9.
+        ...col('dayRate', 'G', 'PSL', 'dropdown', 10, [250, 350, 450, 550]),
+        levelTable: { labelCol: 'M', amountCol: 'N', firstRow: 6 },
         optionLabels: [
           'Medic – Level NUEC-A/AP (PSL 8)',
           'Medic – Level PCP(PSL 9)',
@@ -115,7 +116,7 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       },
       col('medicTotal', 'H', 'TOTAL', 'computed', 0.86),
       col('travel', 'I', 'TRAVEL TIME', 'dropdown', 14.29, [100]),
-      col('perDiem', 'J', 'PER DIEM', 'dropdown', 14.29, [47]),
+      { ...col('perDiem', 'J', 'PER DIEM', 'dropdown', 14.29), ...perDiem },
       col('otherTotal', 'K', 'TOTAL', 'computed', 0.86),
       col('amount', 'L', 'AMOUNT', 'computed', 13.86)
     ],
@@ -124,7 +125,7 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       { title: 'OTHER FEES', from: 'I', to: 'J', fill: '#fff6dd' }
     ],
     totals: [
-      { key: 'hours', cell: 'F22' },
+      { key: 'days', cell: 'F22' },
       { key: 'travel', cell: 'I22' },
       { key: 'perDiem', cell: 'J22' },
       { key: 'amount', cell: 'L22' }
