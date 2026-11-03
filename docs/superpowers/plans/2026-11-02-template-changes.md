@@ -377,7 +377,10 @@ The source of truth is `src/expenseReport/components/ExpenseReport.module.scss`.
 
 Do not start until Walter confirms the list contents. If jeff's list doesn't fit the proposed shape below, stop and update the spec first.
 
-**Update:** the Staff PSL sheet arrived and does not fit this shape. See Task 13 and its open questions. Revise the spec and this task before running it.
+**Update (2026-11-03):** built to the client's answers in Task 13, which replace the shape below:
+- `PayRates { admin?, medicPSL?, course: { AP, ASU, NUECAFull, NUECABridging, NUECI, NUECB } }` from the `Pay Rates` list (`AdminRate`, `MedicPSL`, `Rate*`).
+- Instructor rate = the person's rate for the course type read from the course # (`courseType()` in `rates.ts`). Editing the course # resets the rate. A course # that matches no type is a validation error.
+- Medic rate = the dropdown amount for the person's Medic PSL. Admin rate = Admin Rate. Salaried staff have no row and see the "No pay rate" message.
 
 **Files:**
 - Create: `src/timesheet/rates.ts`, test `src/timesheet/rates.test.ts`
@@ -390,7 +393,7 @@ Do not start until Walter confirms the list contents. If jeff's list doesn't fit
 - `SpPayRateSource.getMyRates(userId: number): Promise<PayRates | undefined>` reads list `Pay Rates` (`Employee` User field, `AdminRate` Currency, `InstructorPSL` Number, `MedicPSL` Number) with `$filter=EmployeeId eq <userId>`.
 - `ITimesheetGridProps.defaultRate?: number`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('fills a blank rate once the row has input', () =>
@@ -400,10 +403,10 @@ it('keeps a rate the user changed', () =>
 it('leaves an empty row alone', () => expect(fillDefaultRate('Admin', {}, 30).rate).toBeUndefined());
 ```
 
-- [ ] **Step 2:** Run `npm test`. Expected: FAIL.
-- [ ] **Step 3:** Implement `rates.ts` and the source. The grid calls `fillDefaultRate` in `onchange` and writes the value back with `setValueFromCoords`. A PSL value must be one of the column's `options`, or it is ignored.
-- [ ] **Step 4:** The form loads the rates once. If there is no row for the current form type, show `No pay rate is set up for you on this timesheet. Contact accounts.` and disable Submit.
-- [ ] **Step 5:** Provisioning: create `Pay Rates` with the fields above, with item-level read security so each person sees only their own row, and Payroll Owners has Edit. Fill the rows from jeff's list.
+- [x] **Step 2:** Run `npm test`. Expected: FAIL.
+- [x] **Step 3:** Implement `rates.ts` and the source. The grid calls `fillDefaultRate` in `onchange` and writes the value back with `setValueFromCoords`. A PSL value must be one of the column's `options`, or it is ignored.
+- [x] **Step 4:** The form loads the rates once. If there is no row for the current form type, show `No pay rate is set up for you on this timesheet. Contact accounts.` and disable Submit.
+- [x] **Step 5:** Provisioning: create `Pay Rates` with the fields above, with item-level read security so each person sees only their own row, and Payroll Owners has Edit. Fill the rows from jeff's list.
 - [ ] **Step 6:** Run `npm test`, expect PASS. Do a manual check: a medic with a PCP level gets `Medic – Level PCP(PSL 9)` on each new row and can change it per shift. Commit: `feat: rates fill from the Pay Rates list`.
 
 ### Task 12: Excel templates use the PEAK-only logo (added by Walter mid-run; run right after Task 7)

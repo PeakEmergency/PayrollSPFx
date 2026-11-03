@@ -183,7 +183,8 @@
     money('RateNUECABridging', 'NUEC-A Bridging'),
     money('RateNUECI', 'NUEC-I'),
     money('RateNUECB', 'NUEC-B'),
-    ['MedicPSL', '<Field Type="Number" Name="MedicPSL" StaticName="MedicPSL" DisplayName="Medic PSL" Decimals="0" Min="8" Max="11" />']
+    ['MedicPSL', '<Field Type="Number" Name="MedicPSL" StaticName="MedicPSL" DisplayName="Medic PSL" Decimals="0" Min="8" Max="11" />'],
+    money('AdminRate', 'Admin Rate')
   ];
   for (const [name, xml] of rateFields) {
     if ((await sp(`${rates}/fields?$filter=InternalName eq '${name}'&$select=Id`)).results.length) { console.log(`  field ${name} exists`); continue; }
@@ -227,6 +228,13 @@
     same('Tytan Wheeler', '6', 340, 8),
     same('William Geise', '6', 340, 8)
   ];
+  // Hourly admin staff (client, 2026-11-03): [Name, Admin Rate]. Lucy McCart, Carolyn Nikodym and Jeffrey Burko
+  // are salaried and submit no admin timesheet, so they have no Admin Rate.
+  const adminStaff = [
+    ['Emma Holden-Hindley', 30],
+    ['Jennifer Treend', 25],
+    ['Rosie Trinh', 24]
+  ];
 
   // Finds the account by exact display name through the people picker (covers people who never visited the site).
   async function findUser(name) {
@@ -242,17 +250,24 @@
   const rateType = (await sp(`${rates}?$select=ListItemEntityTypeFullName`)).ListItemEntityTypeFullName;
   const haveRates = (await sp(`${rates}/items?$select=Title&$top=5000`)).results.map((r) => r.Title.toLowerCase());
   let rateAdded = 0;
-  for (const [name, psl, ...rest] of staff) {
+  const rows = [
+    ...staff.map(([name, psl, ...rest]) => {
+      const fields = { InstructorPSL: psl, MedicPSL: rest[6] };
+      rateCols.forEach((col, i) => { if (rest[i] !== null) fields[col] = rest[i]; });
+      return [name, fields];
+    }),
+    ...adminStaff.map(([name, rate]) => [name, { AdminRate: rate }])
+  ];
+  for (const [name, fields] of rows) {
     if (haveRates.includes(name.toLowerCase())) continue;
-    const body = { __metadata: { type: rateType }, Title: name, InstructorPSL: psl, MedicPSL: rest[6] };
-    rateCols.forEach((col, i) => { if (rest[i] !== null) body[col] = rest[i]; });
+    const body = { __metadata: { type: rateType }, Title: name, ...fields };
     const user = await findUser(name);
     if (user.id) body.EmployeeId = user.id;
     else console.warn(`Pay Rates: ${user.error} for ${name}, set Employee by hand and rerun`);
     await sp(`${rates}/items`, { method: 'POST', body });
     rateAdded++;
   }
-  console.log(`Pay rates: ${rateAdded} added, ${staff.length - rateAdded} already there`);
+  console.log(`Pay rates: ${rateAdded} added, ${rows.length - rateAdded} already there`);
 
   // List: Members read only (items narrow it further), Payroll Owners edit.
   const read = await roleId('Read');

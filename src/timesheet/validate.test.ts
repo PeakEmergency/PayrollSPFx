@@ -23,6 +23,18 @@ it('invalid time is reported with its row', () => {
   expect(validate({ ...base, type: 'Admin', lines })).toContain('Row 3: "abc" is not a valid time.');
 });
 
+it('instructor course # must match a course type', () => {
+  const lines = [{ date: '2026-10-15', course: 'ABC-1', days: 1, dayRate: 225 }, { date: '2026-10-16', course: 'NUEC-A-443F', days: 1, dayRate: 150 }];
+  const errors = validate({ ...base, type: 'Instructor', lines });
+  expect(errors).toContain('Row 1: course # "ABC-1" doesn\'t match a course type. Use the course # from the course title, for example AP-I-0182, ASU-AB-998, NUEC-A-443F, NUEC-A-468B, NUEC-I-195 or NUEC-B-238.');
+  expect(errors.filter((e) => e.indexOf('Row 2') === 0)).toEqual([]);
+});
+
+it('instructor rate needs a course #', () => {
+  const lines = [{ date: '2026-10-15', days: 1, dayRate: 225 }];
+  expect(validate({ ...base, type: 'Instructor', lines })).toContain('Row 1: course # missing.');
+});
+
 it('admin end before start', () => {
   const lines = [{ date: '2026-10-15', start: '17:00', end: '09:00', rate: 20 }];
   expect(validate({ ...base, type: 'Admin', lines })).toContain('Row 1: end time is before start time.');

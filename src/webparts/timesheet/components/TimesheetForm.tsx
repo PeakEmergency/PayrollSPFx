@@ -10,11 +10,14 @@ import { validate } from '../../../timesheet/validate';
 import { SubmitResult } from '../../../services/submit';
 import { PayPeriod } from '../../../timesheet/payPeriods';
 import PayPeriodPicker from './PayPeriodPicker';
+import { hasRate, PayRates } from '../../../timesheet/rates';
 
 export interface ITimesheetFormProps {
   emailTo: string;
   getName(): Promise<string>;
   getPayPeriods(): Promise<PayPeriod[]>;
+  /** The signed-in person's Pay Rates row; undefined when they have none. */
+  getPayRates(): Promise<PayRates | undefined>;
   submit(data: TimesheetData): Promise<SubmitResult>;
   /** Shown in place of the timesheet when the Expense Report button is picked. */
   expenseReport: React.ReactNode;
@@ -28,7 +31,7 @@ const plainTotals: string[] = ['days', 'adminHours', 'deductions', 'hours'];
 const hasEntries = (lines: Line[]): boolean =>
   lines.some((l) => Object.keys(l).some((k) => l[k] !== null && l[k] !== undefined && l[k] !== ''));
 
-export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit, expenseReport }: ITimesheetFormProps): React.ReactElement {
+export default function TimesheetForm({ emailTo, getName, getPayPeriods, getPayRates, submit, expenseReport }: ITimesheetFormProps): React.ReactElement {
   const [type, setType] = React.useState<TimesheetType | undefined>();
   // Both forms stay mounted once opened (just hidden), so switching never loses entries.
   const [showExpense, setShowExpense] = React.useState(false);
@@ -39,6 +42,9 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
   const [to, setTo] = React.useState('');
   const [periods, setPeriods] = React.useState<PayPeriod[] | undefined>();
   const [periodsError, setPeriodsError] = React.useState('');
+  const [rates, setRates] = React.useState<PayRates | undefined>();
+  const [ratesLoaded, setRatesLoaded] = React.useState(false);
+  const [ratesError, setRatesError] = React.useState('');
   const [lines, setLines] = React.useState<Line[]>([]);
   const [gridKey, setGridKey] = React.useState(0);
   const [errors, setErrors] = React.useState<string[]>([]);
@@ -51,6 +57,16 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
 
   React.useEffect(() => {
     getPayPeriods().then(setPeriods, (err: Error) => setPeriodsError(`Pay periods couldn't be loaded: ${err.message}`));
+  }, []);
+
+  React.useEffect(() => {
+    getPayRates().then(
+      (r) => {
+        setRates(r);
+        setRatesLoaded(true);
+      },
+      (err: Error) => setRatesError(`Your pay rates couldn't be loaded: ${err.message}`)
+    );
   }, []);
 
   const switchTo = (t: TimesheetType): void => {
@@ -100,6 +116,7 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
 
   const def = type ? TEMPLATES[type] : undefined;
   const totals = def ? computeTotals(def.type, lines) : {};
+  const rateProblem = !def ? '' : ratesError || (ratesLoaded && !hasRate(def.type, rates) ? 'No pay rate is set up for you on this timesheet. Contact accounts.' : '');
 
   return (
     <>
@@ -156,7 +173,7 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
           </div>
 
           <div className={styles.grid}>
-            <TimesheetGrid key={`${def.type}-${gridKey}`} def={def} lines={lines} onChange={setLines} />
+            <TimesheetGrid key={`${def.type}-${gridKey}`} def={def} lines={lines} rates={rates} onChange={setLines} />
           </div>
 
           <div className={styles.totals}>
@@ -169,7 +186,8 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
             ))}
           </div>
 
-          <PrimaryButton text={submitting ? 'Sending…' : 'Submit'} disabled={submitting || !from || !to} onClick={onSubmit} />
+          {rateProblem && <MessageBar messageBarType={MessageBarType.error}>{rateProblem}</MessageBar>}
+          <PrimaryButton text={submitting ? 'Sending…' : 'Submit'} disabled={submitting || !from || !to || !ratesLoaded || !!rateProblem} onClick={onSubmit} />
         </>
       )}
 

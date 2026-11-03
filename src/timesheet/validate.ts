@@ -1,6 +1,7 @@
 import { TEMPLATES } from './definitions';
 import { TimesheetData } from './types';
 import { normalizeDate, parseTime } from './values';
+import { COURSE_EXAMPLES, courseType } from './rates';
 
 const has = (v: unknown): boolean => v !== null && v !== undefined && String(v).trim() !== '';
 
@@ -33,6 +34,11 @@ export function validate(data: TimesheetData): string[] {
       .filter((c) => c.kind === 'number' && has(line[c.key]) && isNaN(Number(line[c.key])))
       .forEach((c) => errors.push(`Row ${row}: "${line[c.key]}" is not a valid number.`));
     if (data.type !== 'Admin' && has(line.dayRate) && !has(line.days)) errors.push(`Row ${row}: days missing.`);
+    if (data.type === 'Instructor') {
+      if (has(line.course) && !courseType(String(line.course))) {
+        errors.push(`Row ${row}: course # "${line.course}" doesn't match a course type. Use the course # from the course title, for example ${COURSE_EXAMPLES}.`);
+      } else if (has(line.dayRate) && !has(line.course)) errors.push(`Row ${row}: course # missing.`);
+    }
     if (data.type === 'Admin' && times.start && times.end && times.end < times.start) {
       errors.push(`Row ${row}: end time is before start time.`);
     }
