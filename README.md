@@ -66,3 +66,7 @@ The web part writes values into fixed cells (see section 6 of the spec and `src/
 2. Run `pwsh scripts/Convert-Templates.ps1`. It strips the macros and writes `Templates/xlsx/<Type> Timesheet Template.xlsx`.
 3. Run `npm test`. The definitions test fails if headers or formula cells have moved.
 4. Replace the file in the `Timesheet Templates` library, keeping the same name.
+
+## Updating the template logo
+
+Run `powershell -File scripts/Update-TemplateLogo.ps1`. It puts `src/webparts/timesheet/assets/peak-logo.jpg` into the three `Templates/xlsx` files, uncropped, at the logo's aspect ratio. After updating, re-upload the three files in `Templates/xlsx` to the Timesheet Templates library.
