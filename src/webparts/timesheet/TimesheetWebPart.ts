@@ -12,7 +12,7 @@ import { SharePointReportService } from '../../expenseReport/services/SharePoint
 import * as strings from 'TimesheetWebPartStrings';
 import TimesheetForm, { ITimesheetFormProps } from './components/TimesheetForm';
 import { getCurrentEmployee } from '../../services/graph';
-import { SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
+import { PAY_PERIOD_LIST, SpPayPeriodSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
 import { submitTimesheet } from '../../services/submit';
 
 export interface ITimesheetWebPartProps {
@@ -96,6 +96,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
     const props: ITimesheetFormProps = {
       emailTo,
       getName: async () => getCurrentEmployee(await this.graph),
+      getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods(),
       submit: async (data) =>
         submitTimesheet(data, {
           store: new SpSubmissionStore(this.context.spHttpClient, web.absoluteUrl, listTitle),

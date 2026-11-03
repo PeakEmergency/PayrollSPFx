@@ -43,3 +43,15 @@ export function toPayPeriod(row: { Year: number; PeriodNumber: number; FromDate:
   if (!ok) throw new Error(`Bad pay period row in the schedule list: ${JSON.stringify(row)}`);
   return { year: Number(row.Year), number: Number(row.PeriodNumber), from: row.FromDate.slice(0, 10), to: row.ToDate.slice(0, 10) };
 }
+
+/** Local calendar date as 'yyyy-mm-dd' (toISOString would give the UTC date). */
+export function todayIso(): string {
+  const d = new Date();
+  const pad = (n: number): string => (n < 10 ? '0' : '') + n;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** 'yyyy-mm-dd' → 'dd/mm/yy' by string slicing; '' stays ''. */
+export function displayDate(iso: string): string {
+  return iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}` : '';
+}

@@ -7,10 +7,13 @@ import { TEMPLATES } from '../../../timesheet/definitions';
 import { Line, TimesheetData, TimesheetType } from '../../../timesheet/types';
 import { validate } from '../../../timesheet/validate';
 import { SubmitResult } from '../../../services/submit';
+import { PayPeriod } from '../../../timesheet/payPeriods';
+import PayPeriodPicker from './PayPeriodPicker';
 
 export interface ITimesheetFormProps {
   emailTo: string;
   getName(): Promise<string>;
+  getPayPeriods(): Promise<PayPeriod[]>;
   submit(data: TimesheetData): Promise<SubmitResult>;
   /** Shown in place of the timesheet when the Expense Report button is picked. */
   expenseReport: React.ReactNode;
@@ -31,7 +34,7 @@ const plainTotals: string[] = ['days', 'adminHours', 'deductions', 'hours'];
 const hasEntries = (lines: Line[]): boolean =>
   lines.some((l) => Object.keys(l).some((k) => l[k] !== null && l[k] !== undefined && l[k] !== ''));
 
-export default function TimesheetForm({ emailTo, getName, submit, expenseReport }: ITimesheetFormProps): React.ReactElement {
+export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit, expenseReport }: ITimesheetFormProps): React.ReactElement {
   const [type, setType] = React.useState<TimesheetType | undefined>();
   // Both forms stay mounted once opened (just hidden), so switching never loses entries.
   const [showExpense, setShowExpense] = React.useState(false);
@@ -40,6 +43,8 @@ export default function TimesheetForm({ emailTo, getName, submit, expenseReport 
   const [name, setName] = React.useState('');
   const [from, setFrom] = React.useState('');
   const [to, setTo] = React.useState('');
+  const [periods, setPeriods] = React.useState<PayPeriod[] | undefined>();
+  const [periodsError, setPeriodsError] = React.useState('');
   const [lines, setLines] = React.useState<Line[]>([]);
   const [gridKey, setGridKey] = React.useState(0);
   const [errors, setErrors] = React.useState<string[]>([]);
@@ -48,6 +53,10 @@ export default function TimesheetForm({ emailTo, getName, submit, expenseReport 
 
   React.useEffect(() => {
     getName().then(setName, (err: Error) => setErrors([`Couldn't load your name: ${err.message}`]));
+  }, []);
+
+  React.useEffect(() => {
+    getPayPeriods().then(setPeriods, (err: Error) => setPeriodsError(`Pay periods couldn't be loaded: ${err.message}`));
   }, []);
 
   const switchTo = (t: TimesheetType): void => {
@@ -141,12 +150,17 @@ export default function TimesheetForm({ emailTo, getName, submit, expenseReport 
               <div className={styles.name} style={{ fontSize: headerSizes[def.type].name }} aria-label="Name">{name}</div>
               <div className={styles.period}>
                 <div className={styles.periodLabel} style={{ fontSize: headerSizes[def.type].period }}>PAY PERIOD</div>
-                <label>
-                  From: <input type="date" className={from ? '' : styles.empty} value={from} onChange={(e) => setFrom(e.target.value)} />
-                </label>
-                <label>
-                  To: <input type="date" className={to ? '' : styles.empty} value={to} onChange={(e) => setTo(e.target.value)} />
-                </label>
+                <PayPeriodPicker
+                  id="pay-period"
+                  periods={periods}
+                  error={periodsError}
+                  from={from}
+                  to={to}
+                  onChange={(p) => {
+                    setFrom(p.from);
+                    setTo(p.to);
+                  }}
+                />
               </div>
             </div>
           </div>
