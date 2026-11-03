@@ -473,3 +473,8 @@ This task only creates and seeds the list. Task 11 must be revised (spec first) 
 1. PSL 6 is $350 for Jesse Hoevenaars but $340 for Tytan Wheeler and William Geise. In the current Instructor dropdown, 340 is PSL 6 and 350 is PSL 7. Which is right?
 2. The Instructor timesheet has no course-type column, only `COURSE #`. How should a row pick AP, ASU, NUEC-A and so on? Add a course-type dropdown, or derive it from the course number?
 3. Where do Admin pay rates come from?
+
+**Client answers (2026-11-03):**
+1. Jesse Hoevenaars is PSL 7 ($350). The client will fix the spreadsheet. The seed now says 7. The list item created on 2026-11-02 still says 6 and must be changed by hand.
+2. No course-type column. The course # title shows the course type. (Still needed: how to read the type from the title. See the follow-up questions in Task 11.)
+3. Admin hourly rates: Emma $30, Jennifer $25, Rosie $24. Lucy, Carolyn and Jeff are salaried.

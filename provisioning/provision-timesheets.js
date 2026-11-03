@@ -206,7 +206,7 @@
     same('Fiona Pickett', '5', 320, 8),
     same('Jacob Hutton', '5', 320, 9),
     ['Justin Darbyshire', '2/3', 225, 225, 150, 150, 150, 225, 8],
-    same('Jesse Hoevenaars', '6', 350, 9),
+    same('Jesse Hoevenaars', '7', 350, 9), // sheet said 6; client confirmed PSL 7 (2026-11-03)
     same('John Baril', '5', 320, 9),
     same('Josie Hartlin', '4', 280, 8),
     same("Kathryn O'Connor", '5', 320, 8),
