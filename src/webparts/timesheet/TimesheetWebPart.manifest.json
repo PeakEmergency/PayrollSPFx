@@ -24,7 +24,11 @@
     "properties": {
       "emailTo": "accounting@peakemergency.com",
       "listTitle": "Timesheet Submissions",
-      "templateLibraryUrl": ""
+      "templateLibraryUrl": "",
+      "expenseSiteUrl": "https://peakemergency.sharepoint.com",
+      "reportsListTitle": "ExpenseReports",
+      "instructorsListTitle": "Instructors",
+      "defaultRate": "0.48"
     }
   }]
 }

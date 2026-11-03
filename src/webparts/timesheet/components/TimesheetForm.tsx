@@ -12,9 +12,18 @@ export interface ITimesheetFormProps {
   emailTo: string;
   getName(): Promise<string>;
   submit(data: TimesheetData): Promise<SubmitResult>;
+  /** Shown in place of the timesheet when the Expense Report button is picked. */
+  expenseReport: React.ReactNode;
 }
 
 const types: TimesheetType[] = ['Admin', 'Instructor', 'Medic'];
+
+// Header font sizes (pt) that differ per template: name cell A4 and the PAY PERIOD label.
+const headerSizes: Record<TimesheetType, { name: string; period: string }> = {
+  Admin: { name: '22pt', period: '16pt' },
+  Instructor: { name: '24pt', period: '18pt' },
+  Medic: { name: '24pt', period: '16pt' }
+};
 
 // Totals that are counts or hours, not money.
 const plainTotals: string[] = ['days', 'adminHours', 'deductions', 'hours'];
@@ -22,8 +31,11 @@ const plainTotals: string[] = ['days', 'adminHours', 'deductions', 'hours'];
 const hasEntries = (lines: Line[]): boolean =>
   lines.some((l) => Object.keys(l).some((k) => l[k] !== null && l[k] !== undefined && l[k] !== ''));
 
-export default function TimesheetForm({ emailTo, getName, submit }: ITimesheetFormProps): React.ReactElement {
+export default function TimesheetForm({ emailTo, getName, submit, expenseReport }: ITimesheetFormProps): React.ReactElement {
   const [type, setType] = React.useState<TimesheetType | undefined>();
+  // Both forms stay mounted once opened (just hidden), so switching never loses entries.
+  const [showExpense, setShowExpense] = React.useState(false);
+  const [expenseOpened, setExpenseOpened] = React.useState(false);
   const [pendingType, setPendingType] = React.useState<TimesheetType | undefined>();
   const [name, setName] = React.useState('');
   const [from, setFrom] = React.useState('');
@@ -48,6 +60,7 @@ export default function TimesheetForm({ emailTo, getName, submit }: ITimesheetFo
   };
 
   const pick = (t: TimesheetType): void => {
+    setShowExpense(false);
     if (t === type) return;
     if (hasEntries(lines)) setPendingType(t);
     else switchTo(t);
@@ -86,15 +99,29 @@ export default function TimesheetForm({ emailTo, getName, submit }: ITimesheetFo
   const totals = def ? computeTotals(def.type, lines) : {};
 
   return (
+    <>
     <div className={styles.form}>
-      <div className={styles.picker} role="group" aria-label="Timesheet type">
+      <div className={styles.picker} role="group" aria-label="Form type">
+        <button
+          type="button"
+          className={showExpense ? styles.active : ''}
+          aria-pressed={showExpense}
+          onClick={() => {
+            setShowExpense(true);
+            setExpenseOpened(true);
+            setPendingType(undefined);
+          }}
+        >
+          Expense Report
+        </button>
         {types.map((t) => (
-          <button key={t} type="button" className={t === type ? styles.active : ''} aria-pressed={t === type} onClick={() => pick(t)}>
+          <button key={t} type="button" className={t === type && !showExpense ? styles.active : ''} aria-pressed={t === type && !showExpense} onClick={() => pick(t)}>
             {t}
           </button>
         ))}
       </div>
 
+      <div hidden={showExpense}>
       {pendingType && (
         <div className={styles.confirm} role="alertdialog" aria-live="assertive">
           Switching to {pendingType} clears the rows you entered.
@@ -111,9 +138,9 @@ export default function TimesheetForm({ emailTo, getName, submit }: ITimesheetFo
               <img className={styles.logo} src={logo} alt="Peak Emergency" />
             </div>
             <div className={styles.headerRow}>
-              <div className={styles.name} aria-label="Name">{name}</div>
+              <div className={styles.name} style={{ fontSize: headerSizes[def.type].name }} aria-label="Name">{name}</div>
               <div className={styles.period}>
-                <div className={styles.periodLabel}>PAY PERIOD</div>
+                <div className={styles.periodLabel} style={{ fontSize: headerSizes[def.type].period }}>PAY PERIOD</div>
                 <label>
                   From: <input type="date" className={from ? '' : styles.empty} value={from} onChange={(e) => setFrom(e.target.value)} />
                 </label>
@@ -154,6 +181,10 @@ export default function TimesheetForm({ emailTo, getName, submit }: ITimesheetFo
         )}
         {sent && <div className={styles.sent}>{sent}</div>}
       </div>
+      </div>
     </div>
+    {/* Outside .form so the timesheet button styles don't restyle the Fluent UI controls. */}
+    {expenseOpened && <div hidden={!showExpense}>{expenseReport}</div>}
+    </>
   );
 }

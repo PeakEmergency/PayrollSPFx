@@ -71,21 +71,20 @@ $emptyFill: #fff2cc;
 }
 
 .name {
-  font-size: 24pt;
   font-weight: bold;
   min-height: 1.2em;
 }
 
 .period {
   label {
-    font-size: 11pt;
+    font-size: 14pt; // template G4/I4 are Arial 14 bold
     font-weight: bold;
     margin-right: 12px;
   }
 
   input {
     font-family: inherit;
-    font-size: 12pt;
+    font-size: 14pt;
     font-weight: bold;
     color: #000;
     border: 1px solid transparent;
@@ -102,7 +101,6 @@ $emptyFill: #fff2cc;
 
 .periodLabel {
   color: $red;
-  font-size: 16pt;
   font-weight: bold;
 }
 
@@ -115,7 +113,7 @@ $emptyFill: #fff2cc;
     text-align: center !important; // headers centred even over left-aligned text columns
     font-weight: bold;
     font-size: 10pt;
-    white-space: normal;
+    white-space: pre-line; // wraps long titles and honours a \n in a header
   }
 
   :global(.jss_worksheet tbody td) {
@@ -137,11 +135,12 @@ $emptyFill: #fff2cc;
 .totals {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 8px 48px; // client asked for the totals to be spaced out
   padding: 8px;
   margin: 8px 0;
   background: $headerFill;
   color: $totalsRed;
+  font-size: 11pt; // template totals row values are Arial 11 bold
   font-weight: bold;
 }
 

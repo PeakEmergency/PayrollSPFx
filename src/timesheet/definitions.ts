@@ -22,7 +22,7 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
     columns: [
       col('date', 'A', 'DATE', 'date', 10.71),
       col('start', 'C', 'START TIME', 'time', 10.71),
-      col('end', 'D', 'END TIME', 'time', 10.71),
+      col('end', 'D', 'END\nTIME','time', 10.71), // client asked for END stacked over TIME
       col('deductions', 'E', 'DEDUCTIONS', 'dropdown', 15.71, [0, 0.5, 1, 1.25, 1.5, 1.75, 2]),
       col('hours', 'F', 'TOTAL HOURS(s)', 'computed', 10.14),
       col('rate', 'G', 'PAY RATE', 'number', 14.14),

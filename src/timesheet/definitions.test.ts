@@ -28,7 +28,7 @@ describe('definitions match the real templates', () => {
       });
 
       def.columns.forEach((c) => {
-        expect(collapse(String(ws!.getCell(`${c.col}${def.headerRow}`).value))).toBe(c.header);
+        expect(collapse(String(ws!.getCell(`${c.col}${def.headerRow}`).value))).toBe(collapse(c.header));
         if (c.kind === 'computed') {
           expect(ws!.getCell(`${c.col}${def.firstRow}`).formula).toBeTruthy();
         }
