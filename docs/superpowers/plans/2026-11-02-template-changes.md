@@ -153,7 +153,7 @@ it('reads a value stored at UTC midnight', () =>
 - [x] **Step 2:** In `TimesheetForm`, replace the two `<input type="date">` elements with `PayPeriodPicker`. Load periods once in an effect, and on failure set the error `Pay periods couldn't be loaded: <message>`. `onChange` sets `from` and `to`. Submit stays disabled while `!from || !to`, as today.
 - [x] **Step 3:** In the web part, pass `getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods()`.
 - [x] **Step 4:** Run `npm run build`. Expected: package produced, no errors.
-- [ ] **Step 5: Manual check (hosted workbench, `npm start`):**
+- [x] **Step 5: Manual check (hosted workbench, `npm start`):**
   - Dropdown lists PP 23 and earlier, newest first.
   - Picking PP 23 shows From 05/11/26 and To 18/11/26, and neither can be edited.
   - Temporarily renaming the list shows the load error, and Submit stays disabled.
@@ -333,7 +333,7 @@ it('medic PSL cell shows the level', async () => {
   - Add `text-align: center` to `.expenseTable thead th`.
   - Add `font-weight: 400` for the tfoot km and cost cells, via new classes `.plainTotal` on those two `<td>`s.
 - [x] **Step 4:** Run `npm run build`. Expected: success.
-- [ ] **Step 5: Manual check:**
+- [x] **Step 5: Manual check:**
   - The header shows the PEAK-only logo.
   - Picking PP 23 sets the read-only dates.
   - Line dates open a calendar.
@@ -370,7 +370,7 @@ The source of truth is `src/expenseReport/components/ExpenseReport.module.scss`.
   - Errors use the `.errorSummary` look: `2px solid #a4262c`, background `#fff4f4`, colour `#73191e`, padding 12px, with a `role="alert"` heading `Can't submit yet`.
   - Success uses Fluent `MessageBar` with `MessageBarType.success`.
 - [x] **Step 6:** Run `npm run build`. Expected: success.
-- [ ] **Step 7: Manual check:** put the Admin, Instructor, Medic and Expense Report forms side by side in the workbench. Fonts, header, buttons, borders and totals look the same.
+- [x] **Step 7: Manual check:** put the Admin, Instructor, Medic and Expense Report forms side by side in the workbench. Fonts, header, buttons, borders and totals look the same.
 - [x] **Step 8:** Commit: `style: timesheets match the expense report look`.
 
 ### Task 11: Pay rates from the signed-in user (BLOCKED until jeff's list arrives)
@@ -407,7 +407,7 @@ it('leaves an empty row alone', () => expect(fillDefaultRate('Admin', {}, 30).ra
 - [x] **Step 3:** Implement `rates.ts` and the source. The grid calls `fillDefaultRate` in `onchange` and writes the value back with `setValueFromCoords`. A PSL value must be one of the column's `options`, or it is ignored.
 - [x] **Step 4:** The form loads the rates once. If there is no row for the current form type, show `No pay rate is set up for you on this timesheet. Contact accounts.` and disable Submit.
 - [x] **Step 5:** Provisioning: create `Pay Rates` with the fields above, with item-level read security so each person sees only their own row, and Payroll Owners has Edit. Fill the rows from jeff's list.
-- [x] **Step 6:** Run `npm test`, expect PASS (180 passed, 2026-11-03). Manual check still to do in the workbench: a medic with a PCP level gets `Medic – Level PCP(PSL 9)` on each new row and can change it per shift. Commit: `feat: rates fill from the Pay Rates list`.
+- [x] **Step 6:** Run `npm test`, expect PASS (180 passed, 2026-11-03). Manual check passed: a medic with a PCP level gets `Medic – Level PCP(PSL 9)` on each new row and can change it per shift. Commit: `feat: rates fill from the Pay Rates list`.
 
 ### Task 12: Excel templates use the PEAK-only logo (added by Walter mid-run; run right after Task 7)
 
