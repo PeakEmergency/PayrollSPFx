@@ -2,6 +2,7 @@ import * as React from 'react';
 import { TextField } from '@fluentui/react';
 import { ExpenseLine, ExpenseReport, ValidationIssue } from '../domain/models';
 import { calculateReport, formatCurrency, formatQuantity } from '../domain/calculations';
+import DateField from './DateField';
 import styles from './ExpenseReport.module.scss';
 
 export interface IExpenseTableProps {
@@ -15,11 +16,16 @@ export interface IExpenseTableProps {
 export default function ExpenseTable({ report, instanceId, disabled, issues, onChange }: IExpenseTableProps): React.ReactElement {
   const totals = calculateReport(report);
   const header = (field: string): string => `${instanceId}-head-${field}`;
+  const dateInput = (index: number): React.ReactElement => {
+    const error = issues.find(issue => issue.field === `lines.${index}.date`)?.message;
+    return <DateField id={`${instanceId}-row-${index}-date`} label="" ariaLabel={`Row ${index + 1} date`}
+      value={report.lines[index].date} disabled={disabled} errorMessage={error} onChange={value => onChange(index, 'date', value)} />;
+  };
   const input = (index: number, field: keyof ExpenseLine, name: string, numeric = false): React.ReactElement => {
     const error = issues.find(issue => issue.field === `lines.${index}.${field}`)?.message;
     return <><TextField id={`${instanceId}-row-${index}-${field}`} ariaLabel={`Row ${index + 1} ${name}`}
       value={report.lines[index][field]} disabled={disabled} borderless errorMessage={error}
-      aria-invalid={!!error} placeholder={field === 'date' ? 'DD/MM/YY' : undefined} autoComplete="off"
+      aria-invalid={!!error} autoComplete="off"
       className={numeric ? styles.numericInput : styles.cellInput} inputMode={numeric ? 'decimal' : undefined}
       onChange={(_, value) => onChange(index, field, value || '')} />
       <span className={styles.printValue}>{report.lines[index][field] || '\u00a0'}</span></>;
@@ -43,7 +49,7 @@ export default function ExpenseTable({ report, instanceId, disabled, issues, onC
           <th scope="col" id={header('cost')} className={styles.otherHeading}>COST<br />(excl. GST)</th></tr>
       </thead>
       <tbody>{report.lines.map((line, index) => <tr key={line.id}>
-        <td headers={header('date')} className={styles.dateCell}>{input(index, 'date', 'date')}</td>
+        <td headers={header('date')} className={styles.dateCell}>{dateInput(index)}</td>
         <td headers={`${header('mileage')} ${header('start')}`} className={styles.sectionStart}>{input(index, 'startCity', 'start city and postal code')}</td>
         <td headers={`${header('mileage')} ${header('end')}`}>{input(index, 'endCity', 'end city and postal code')}</td>
         <td headers={`${header('mileage')} ${header('km')}`}>{input(index, 'kilometres', 'total km', true)}</td>
@@ -54,11 +60,11 @@ export default function ExpenseTable({ report, instanceId, disabled, issues, onC
         <td headers={header('amount')} aria-label={`Row ${index + 1} amount`} className={`${styles.calculated} ${styles.amountCell}`}>{formatCurrency(totals.lines[index].amount)}</td>
       </tr>)}</tbody>
       <tfoot><tr><th colSpan={3} scope="row">TOTALS</th>
-        <td aria-label="Report total km" className={styles.calculated}>{formatQuantity(totals.kilometres)}</td>
+        <td aria-label="Report total km" className={`${styles.calculated} ${styles.plainTotal}`}>{formatQuantity(totals.kilometres)}</td>
         <td aria-label="Report mileage total" className={styles.calculated}>{formatCurrency(totals.mileage)}</td>
         <td className={styles.sectionStart} />
         <td aria-label="Report GST total" className={styles.calculated}>{formatCurrency(totals.gst)}</td>
-        <td aria-label="Report cost total" className={styles.calculated}>{formatCurrency(totals.cost)}</td>
+        <td aria-label="Report cost total" className={`${styles.calculated} ${styles.plainTotal}`}>{formatCurrency(totals.cost)}</td>
         <td aria-label="Report amount" className={`${styles.calculated} ${styles.amountCell}`}>{formatCurrency(totals.amount)}</td>
       </tr></tfoot>
     </table>

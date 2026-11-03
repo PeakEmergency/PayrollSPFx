@@ -3,11 +3,13 @@ import { Calendar, Callout, DayOfWeek, DefaultButton, DirectionalHint, IconButto
 import { calendarStartDate, fromCalendarDate, parseDateInput } from '../domain/dates';
 import styles from './ExpenseReport.module.scss';
 
-export interface IPayPeriodDateFieldProps {
+export interface IDateFieldProps {
   id: string;
-  label: 'From' | 'To';
+  /** 'From'/'To' also pick the range check against otherValue; '' hides the visible label. */
+  label: string;
+  ariaLabel?: string;
   value: string;
-  otherValue: string;
+  otherValue?: string;
   disabled: boolean;
   errorMessage?: string;
   onChange: (value: string) => void;
@@ -23,16 +25,17 @@ const calendarStrings = {
   monthPickerHeaderAriaLabel: '{0}, select to change month', yearPickerHeaderAriaLabel: '{0}, select to change year'
 };
 
-export default function PayPeriodDateField(props: IPayPeriodDateFieldProps): React.ReactElement {
+export default function DateField(props: IDateFieldProps): React.ReactElement {
   const [open, setOpen] = React.useState(false);
   const [rangeError, setRangeError] = React.useState('');
   const anchor = React.useRef<HTMLDivElement>(null);
   const button = React.useRef<HTMLButtonElement>(null);
+  const name = props.label || props.ariaLabel || 'date';
   const close = (): void => { setOpen(false); button.current?.focus(); };
   const choose = (date: Date): void => {
     const raw = fromCalendarDate(date);
     const iso = parseDateInput(raw);
-    const other = parseDateInput(props.otherValue);
+    const other = props.otherValue ? parseDateInput(props.otherValue) : undefined;
     if (iso && other && ((props.label === 'To' && iso < other) || (props.label === 'From' && iso > other))) {
       setRangeError(props.label === 'To'
         ? `The TO date can't be before the FROM date (${props.otherValue}).`
@@ -43,19 +46,19 @@ export default function PayPeriodDateField(props: IPayPeriodDateFieldProps): Rea
   };
   return <div className={styles.payDate} ref={anchor}>
     <div className={styles.dateEntry}>
-      <TextField id={props.id} label={`${props.label}:`} value={props.value} placeholder="DD/MM/YY"
-        className={!props.value ? styles.emptyDate : undefined} disabled={props.disabled} required
+      <TextField id={props.id} label={props.label ? `${props.label}:` : undefined} ariaLabel={props.ariaLabel} value={props.value} placeholder="DD/MM/YY"
+        className={!props.value ? styles.emptyDate : undefined} disabled={props.disabled} required={!!props.label}
         errorMessage={props.errorMessage} autoComplete="off"
         onChange={(_, value) => { setRangeError(''); props.onChange(value || ''); }}
         onDoubleClick={() => !props.disabled && setOpen(true)}
         onKeyDown={event => { if (event.altKey && event.key === 'ArrowDown' && !props.disabled) { event.preventDefault(); setOpen(true); } }} />
       <IconButton elementRef={button} className={styles.calendarButton} iconProps={{ iconName: 'Calendar' }}
-        ariaLabel={`Open ${props.label} calendar`} title={`Open ${props.label} calendar`}
+        ariaLabel={`Open ${name} calendar`} title={`Open ${name} calendar`}
         aria-expanded={open} aria-controls={open ? `${props.id}-calendar` : undefined} disabled={props.disabled}
         onClick={() => { setRangeError(''); setOpen(!open); }} />
     </div>
-    <div className={styles.printDate}><strong>{props.label}:</strong> {props.value || '—'}</div>
-    {open && !props.disabled && <Callout target={anchor} role="dialog" ariaLabel={`${props.label} calendar`}
+    <div className={styles.printDate}>{props.label && <strong>{props.label}: </strong>}{props.value || ' '}</div>
+    {open && !props.disabled && <Callout target={anchor} role="dialog" ariaLabel={`${name} calendar`}
       id={`${props.id}-calendar`} className={styles.calendarPopup} directionalHint={DirectionalHint.bottomLeftEdge}
       isBeakVisible={false} setInitialFocus calloutMaxWidth={320} onDismiss={() => setOpen(false)}
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); close(); } }}>

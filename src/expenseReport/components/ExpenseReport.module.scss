@@ -51,6 +51,7 @@
 .descriptionColumn { width: 19%; }
 .amountColumn { width: 13%; }
 .expenseTable th { font-size: 14px; line-height: 1.3; padding: 7px 4px; border: 1px solid #b2b2b2; border-top: 0; }
+.expenseTable thead th { text-align: center; }
 .expenseTable th small { display: block; font-size: 10px; font-weight: 400; margin-top: 2px; }
 .expenseTable td { border-bottom: 1px solid #b2b2b2; border-right: 1px solid #b2b2b2; height: 36px; padding: 0; vertical-align: top; }
 .expenseTable tbody tr:first-child td { border-top: 1px solid #b2b2b2; }
@@ -69,6 +70,7 @@
 .numericInput :global(.ms-TextField-field) { text-align: right; }
 .cellInput :global(.ms-TextField-errorMessage), .numericInput :global(.ms-TextField-errorMessage) { font-size: 11px; padding: 3px; }
 .expenseTable tfoot th, .expenseTable tfoot td { background: #f1f1f1; color: #e00000; font-weight: 700; border: 0; border-top: 10px solid #fff; padding: 8px 5px; }
+.expenseTable tfoot td.plainTotal { font-weight: 400; }
 .expenseTable tfoot th { text-align: left; font-size: 16px; }
 .receipts { margin: 18px 0 12px; }
 .receipts h2 { font-size: 16px; margin: 0 0 5px; }

@@ -81,6 +81,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
         defaultRate: this.properties.defaultRate || '0.48',
         user: { key: this.context.pageContext.user.loginName, name: this._userName },
         userEmail: this.context.pageContext.user.email,
+        getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, this.context.pageContext.web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods(),
         instanceId: this.instanceId,
         isDarkTheme: this._theme?.isInverted || false
       })

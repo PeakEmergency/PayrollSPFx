@@ -4,9 +4,11 @@ import { IReportService } from '../services/IReportService';
 import { ExpenseLine, ExpenseReport as Report, ReceiptInfo, ReportSummary } from '../domain/models';
 import { createReport, validateReport } from '../domain/report';
 import ExpenseTable from './ExpenseTable';
-import PayPeriodDateField from './PayPeriodDateField';
+import PayPeriodPicker from '../../webparts/timesheet/components/PayPeriodPicker';
 import Receipts from './Receipts';
-import peakLogo from './assets/peak-logo.jpg';
+import peakLogo from '../../webparts/timesheet/assets/peak-logo.jpg';
+import { PayPeriod } from '../../timesheet/payPeriods';
+import { formatDateInput, parseDateInput } from '../domain/dates';
 import styles from './ExpenseReport.module.scss';
 
 const confirmationStyles = styles as unknown as Record<string, string>;
@@ -16,6 +18,7 @@ export interface IExpenseReportProps {
   defaultRate: string;
   user: { key: string; name: string };
   userEmail: string;
+  getPayPeriods(): Promise<PayPeriod[]>;
   instanceId: string;
   isDarkTheme?: boolean;
   isPreview?: boolean;
@@ -49,6 +52,8 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
   const [pendingAction, setPendingAction] = React.useState<PendingAction>();
   const confirmRef = React.useRef<HTMLElement>(null);
   const restoreFocusRef = React.useRef<HTMLElement | null>(null);
+  const [periods, setPeriods] = React.useState<PayPeriod[] | undefined>();
+  const [periodsError, setPeriodsError] = React.useState('');
   const [reload, setReload] = React.useState(0);
   const summary = React.useRef<HTMLDivElement>(null);
   const issues = showValidation ? validateReport(report) : [];
@@ -73,6 +78,10 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     list.then(() => { if (active) setLoading(false); }).catch(() => undefined);
     return () => { active = false; };
   }, [props.service, reload]);
+
+  React.useEffect(() => {
+    props.getPayPeriods().then(setPeriods, (err: Error) => setPeriodsError(`Pay periods couldn't be loaded: ${err.message}`));
+  }, []);
 
   React.useEffect(() => {
     if (!dirty) return;
@@ -174,7 +183,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
       {props.isPreview && <MessageBar className={styles.noPrint}>Local preview — reports and receipts are stored in memory for this session.</MessageBar>}
       <div className={styles.brandRow}>
         <h1 id={`${props.instanceId}-title`}>EXPENSE REPORT</h1>
-        <img className={styles.logo} src={peakLogo} alt="Peak paramedic services" />
+        <img className={styles.logo} src={peakLogo} alt="Peak Emergency" />
       </div>
       <div className={styles.reportHeader}>
         <div className={styles.instructor}><div>Instructor</div><strong style={{ fontSize: 24 }}>{report.instructorName || '—'}</strong>
@@ -183,10 +192,9 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
         <section className={styles.payPeriod} aria-labelledby={`${props.instanceId}-pay-period`}>
           <h2 id={`${props.instanceId}-pay-period`}>PAY PERIOD</h2>
           <div className={styles.payFields}>
-            <PayPeriodDateField id={`${props.instanceId}-from`} label="From" value={report.fromDate} otherValue={report.toDate}
-              disabled={locked} errorMessage={issue('fromDate')} onChange={value => setHeader('fromDate', value)} />
-            <PayPeriodDateField id={`${props.instanceId}-to`} label="To" value={report.toDate} otherValue={report.fromDate}
-              disabled={locked} errorMessage={issue('toDate')} onChange={value => setHeader('toDate', value)} />
+            <PayPeriodPicker id={`${props.instanceId}-pay-period-picker`} periods={periods} error={periodsError || issue('fromDate') || issue('toDate')}
+              from={parseDateInput(report.fromDate) || ''} to={parseDateInput(report.toDate) || ''} disabled={locked}
+              onChange={p => { setHeader('fromDate', formatDateInput(p.from)); setHeader('toDate', formatDateInput(p.to)); }} />
           </div>
         </section>
       </div>
@@ -210,7 +218,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
         onRemove={index => { if (!busyRef.current) setPendingFiles(current => current.filter((_, i) => i !== index)); }} />
       <div className={`${styles.actionArea} ${styles.noPrint}`}>
         <div className={styles.actions}>
-          <PrimaryButton text="Save" disabled={locked || loading || !!loadError} onClick={() => { save().catch(error => setOperationError(errorText(error))); }} />
+          <PrimaryButton text="Save" disabled={locked || loading || !!loadError || !report.fromDate || !report.toDate} onClick={() => { save().catch(error => setOperationError(errorText(error))); }} />
           <DefaultButton text="New report" disabled={locked} onClick={() => requestAction({ type: 'new' })} />
           <DefaultButton text="Print" disabled={locked} onClick={() => window.print()} />
           {busy && <Spinner size={SpinnerSize.small} label={busy === 'saving' ? 'Saving report and receipts…' : 'Opening report…'} />}
