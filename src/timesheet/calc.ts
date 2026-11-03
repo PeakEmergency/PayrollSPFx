@@ -9,14 +9,12 @@ const num = (v: Line[string]): number => (typeof v === 'number' ? v : 0);
 
 const has = (v: Line[string]): boolean => v !== null && v !== undefined && v !== '';
 
-/** Hours between two times as typed; null unless both parse. Wraps past midnight when asked (Medic). */
-function hoursBetween(start: Line[string], end: Line[string], wrap: boolean): number | null {
+/** Hours between two times as typed; null unless both parse. */
+function hoursBetween(start: Line[string], end: Line[string]): number | null {
   const s = parseTime(String(start ?? ''));
   const e = parseTime(String(end ?? ''));
   if (!s || !e) return null;
-  let diff = timeToDayFraction(e) - timeToDayFraction(s);
-  if (wrap) diff = ((diff % 1) + 1) % 1;
-  return diff * 24;
+  return (timeToDayFraction(e) - timeToDayFraction(s)) * 24;
 }
 
 /** Returns the line with its computed columns filled. A row with no inputs computes to null. */
@@ -30,7 +28,7 @@ export function computeLine(type: TimesheetType, line: Line): Line {
   }
 
   if (type === 'Admin') {
-    const span = hoursBetween(line.start, line.end, false);
+    const span = hoursBetween(line.start, line.end);
     const hours = span === null ? null : round2(span - num(line.deductions));
     out.hours = hours;
     out.amount = round2(num(hours) * num(line.rate));
@@ -41,9 +39,7 @@ export function computeLine(type: TimesheetType, line: Line): Line {
     out.otherTotal = round2(num(line.travel) + num(line.perDiem));
     out.amount = round2(num(out.instrTotal) + num(out.adminTotal) + num(out.otherTotal));
   } else {
-    const span = hoursBetween(line.start, line.end, true);
-    out.hours = span === null ? null : round2(span);
-    out.medicTotal = round2(num(line.dayRate));
+    out.medicTotal = round2(num(line.days) * num(line.dayRate));
     out.otherTotal = round2(num(line.travel) + num(line.perDiem));
     out.amount = round2(num(out.medicTotal) + num(out.otherTotal));
   }

@@ -102,11 +102,9 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
     columns: [
       col('date', 'A', 'DATE', 'date', 10.71),
       col('client', 'C', 'CLIENT', 'upper', 30.71),
-      col('start', 'D', 'TIME START', 'time', 10.71),
-      col('end', 'E', 'TIME END', 'time', 10.71),
-      col('hours', 'F', 'HOURS(s)', 'computed', 10.71),
+      col('days', 'F', 'DAYS', 'dropdown', 10.71, [0.5, 1]),
       {
-        ...col('dayRate', 'G', 'RATE', 'dropdown', 10, [250, 350, 450, 550]),
+        ...col('dayRate', 'G', 'PSL', 'dropdown', 10, [250, 350, 450, 550]),
         // Template lookup table M6:N9.
         optionLabels: [
           'Medic – Level NUEC-A/AP (PSL 8)',
@@ -126,7 +124,7 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       { title: 'OTHER FEES', from: 'I', to: 'J', fill: '#fff6dd' }
     ],
     totals: [
-      { key: 'hours', cell: 'F22' },
+      { key: 'days', cell: 'F22' },
       { key: 'travel', cell: 'I22' },
       { key: 'perDiem', cell: 'J22' },
       { key: 'amount', cell: 'L22' }

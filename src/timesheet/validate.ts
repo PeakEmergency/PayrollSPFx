@@ -32,6 +32,7 @@ export function validate(data: TimesheetData): string[] {
     inputs
       .filter((c) => c.kind === 'number' && has(line[c.key]) && isNaN(Number(line[c.key])))
       .forEach((c) => errors.push(`Row ${row}: "${line[c.key]}" is not a valid number.`));
+    if (data.type !== 'Admin' && has(line.dayRate) && !has(line.days)) errors.push(`Row ${row}: days missing.`);
     if (data.type === 'Admin' && times.start && times.end && times.end < times.start) {
       errors.push(`Row ${row}: end time is before start time.`);
     }

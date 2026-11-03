@@ -14,16 +14,6 @@ async function loadExcelJs(): Promise<typeof ExcelJSType> {
   return mod.default || mod;
 }
 
-/** Medic formula corrections from the spec (Global Constraints); written as plain formulas over the shared ones. */
-function fixMedicFormulas(ws: ExcelJSType.Worksheet, firstRow: number, lastRow: number): void {
-  for (let r = firstRow; r <= lastRow; r++) {
-    ws.getCell(`H${r}`).value = { formula: `G${r}` } as ExcelJSType.CellFormulaValue;
-    ws.getCell(`F${r}`).value = { formula: `MOD(E${r}-D${r},1)*24` } as ExcelJSType.CellFormulaValue;
-  }
-  ws.getCell('K20').value = { formula: 'SUM(I20:J20)' } as ExcelJSType.CellFormulaValue;
-  ws.getCell('J22').value = { formula: 'SUM(J8:J20)' } as ExcelJSType.CellFormulaValue;
-}
-
 /** Writes the column headings from the definitions into the template header row, keeping cell styles. */
 export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
   def.columns.forEach((c) => {
@@ -31,6 +21,19 @@ export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
     cell.value = c.header;
     if (c.header.indexOf('\n') >= 0) cell.alignment = { ...cell.alignment, wrapText: true };
   });
+  if (def.type === 'Medic') {
+    // DAYS is an input in F, so the hours formulas go; start/end columns D:E are hidden (F4:G4 'From:' stays visible).
+    ['D', 'E'].forEach((c) => {
+      ws.getCell(`${c}${def.headerRow}`).value = null;
+      ws.getColumn(c).hidden = true;
+    });
+    for (let r = def.firstRow; r < def.firstRow + def.rowCount; r++) {
+      ws.getCell(`F${r}`).value = null;
+      ws.getCell(`H${r}`).value = { formula: `F${r}*G${r}` } as ExcelJSType.CellFormulaValue;
+    }
+    ws.getCell('K20').value = { formula: 'SUM(I20:J20)' } as ExcelJSType.CellFormulaValue;
+    ws.getCell('J22').value = { formula: 'SUM(J8:J20)' } as ExcelJSType.CellFormulaValue;
+  }
 }
 
 /** Fills a copy of the stored template. Only cell values change; styles and formats stay. */
@@ -65,8 +68,6 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
       }
     });
   });
-
-  if (data.type === 'Medic') fixMedicFormulas(ws, def.firstRow, def.firstRow + def.rowCount - 1);
 
   // Cached results, so previewers that don't recalculate (Outlook, phones) show real totals.
   const setResult = (address: string, result: Line[string] | undefined): void => {

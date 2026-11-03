@@ -20,7 +20,7 @@ it('To before From', () => {
 
 it('invalid time is reported with its row', () => {
   const lines: Line[] = [{}, {}, { date: '2026-10-15', start: 'abc' }];
-  expect(validate({ ...base, lines })).toContain('Row 3: "abc" is not a valid time.');
+  expect(validate({ ...base, type: 'Admin', lines })).toContain('Row 3: "abc" is not a valid time.');
 });
 
 it('admin end before start', () => {
@@ -41,3 +41,9 @@ it('invalid pay rate is reported with its row', () => {
   const lines = [{ date: '2026-10-15', start: '08:00', end: '16:00', rate: '$25' }];
   expect(validate({ ...base, type: 'Admin', lines })).toContain('Row 1: "$25" is not a valid number.');
 });
+
+it('medic row with a PSL but no days', () =>
+  expect(validate({ ...base, from: '2026-11-05', to: '2026-11-18', lines: [{ date: '2026-11-05', dayRate: 350 }] })).toContain('Row 1: days missing.'));
+
+it('instructor row with a PSL but no days', () =>
+  expect(validate({ ...base, type: 'Instructor', from: '2026-11-05', to: '2026-11-18', lines: [{ date: '2026-11-05', dayRate: 280 }] })).toContain('Row 1: days missing.'));

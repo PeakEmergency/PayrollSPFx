@@ -10,7 +10,7 @@ const data: TimesheetData = {
   name: 'NIKODYM, CAROLYN',
   from: '2026-10-01',
   to: '2026-10-15',
-  lines: [{ date: '2026-10-15', client: 'acme', start: '19:00', end: '07:00', dayRate: 450, travel: 100, perDiem: 47 }, {}]
+  lines: [{ date: '2026-10-15', client: 'acme', days: 1, dayRate: 450, travel: 100, perDiem: 47 }, {}]
 };
 
 interface Fakes {

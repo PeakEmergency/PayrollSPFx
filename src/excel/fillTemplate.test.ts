@@ -24,7 +24,7 @@ async function fill(type: TimesheetType, lines: Line[]): Promise<ExcelJS.Workshe
   return load(await fillTemplate(toArrayBuffer(fixture(type)), data), type);
 }
 
-const line: Line = { date: '2026-10-15', client: 'acme', start: '06:00', end: '18:00', dayRate: 450, travel: 100, perDiem: 47 };
+const line: Line = { date: '2026-10-15', client: 'acme', days: 1, dayRate: 450, travel: 100, perDiem: 47 };
 
 it('fillTemplate writes header', async () => {
   const ws = await fill('Medic', [line]);
@@ -47,12 +47,15 @@ it('fillTemplate keeps row positions', async () => {
   ['C9', 'C10', 'C11'].forEach((a) => expect(ws.getCell(a).value).toBeNull());
 });
 
-it('medic formula fixes', async () => {
+it('medic writes DAYS in F and hides D:E', async () => {
   const ws = await fill('Medic', [line]);
-  expect(ws.getCell('H8').formula).toBe('G8');
-  expect(ws.getCell('H19').formula).toBe('G19');
-  expect(ws.getCell('F8').formula).toBe('MOD(E8-D8,1)*24');
-  expect(ws.getCell('F20').formula).toBe('MOD(E20-D20,1)*24');
+  expect(ws.getCell('F8').value).toBe(1);
+  expect(ws.getCell('F7').value).toBe('DAYS');
+  expect(ws.getColumn('D').hidden && ws.getColumn('E').hidden).toBe(true);
+  expect(ws.getCell('F22').formula).toBe('SUM(F8:F20)');
+  expect(ws.getCell('F9').formula).toBeFalsy();
+  expect(ws.getCell('H8').formula).toBe('F8*G8');
+  expect(ws.getCell('H19').formula).toBe('F19*G19');
   expect(ws.getCell('K20').formula).toBe('SUM(I20:J20)');
   expect(ws.getCell('J22').formula).toBe('SUM(J8:J20)');
 });
@@ -68,16 +71,11 @@ it('other templates untouched', async () => {
     const original = await load(fixture(type), type);
     // Hidden columns compare as 'hidden': ExcelJS round-trips some hidden width-0 ranges as width 9.
     const widths = (ws: ExcelJS.Worksheet): (number | string | undefined)[] => ws.columns.map((c) => (c.hidden ? 'hidden' : c.width));
-    expect(widths(filled)).toEqual(widths(original));
+    const expected = widths(original);
+    if (type === 'Medic') expected[3] = expected[4] = 'hidden'; // layout hides D:E (start/end)
+    expect(widths(filled)).toEqual(expected);
   }
 }, 60000); // loads and writes 8 workbooks
-
-it('times written as day fractions', async () => {
-  const ws = await fill('Medic', [line]);
-  // ExcelJS reads time-formatted numbers back as Dates on the 1899-12-30 epoch.
-  const serial = ((ws.getCell('D8').value as Date).getTime() - Date.UTC(1899, 11, 30)) / 86400000;
-  expect(serial).toBe(0.25);
-});
 
 it('uppercase', async () => {
   const ws = await fill('Medic', [line]);
@@ -87,11 +85,10 @@ it('uppercase', async () => {
 it('formula cells carry computed results for previewers that do not recalculate', async () => {
   const ws = await fill('Medic', [line]);
   const result = (a: string): unknown => (ws.getCell(a).value as { result?: unknown }).result;
-  expect(result('F8')).toBe(12);
   expect(result('H8')).toBe(450);
   expect(result('K8')).toBe(147);
   expect(result('L8')).toBe(597);
-  expect(result('F22')).toBe(12);
+  expect(result('F22')).toBe(1);
   expect(result('J22')).toBe(47);
   expect(result('L22')).toBe(597);
 });
