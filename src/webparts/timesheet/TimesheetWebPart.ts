@@ -50,7 +50,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
         ).catch(() => undefined);
       }
       return this._userNameError
-        ? React.createElement(MessageBar, { messageBarType: MessageBarType.error }, )
+        ? React.createElement(MessageBar, { messageBarType: MessageBarType.error }, `Your name couldn't be loaded. Refresh the page. (${this._userNameError})`)
         : React.createElement(Spinner, { label: 'Loading your details…' });
     }
     const siteUrl = (this.properties.expenseSiteUrl || this.context.pageContext.web.absoluteUrl).replace(/\/$/, '');
