@@ -75,6 +75,8 @@ This builds on the uncommitted work that folded the Expense Report into this web
 
 19. The `.xlsx` templates in `Templates/xlsx/` get the same heading, column and per diem changes as the web form, with the From and To dates filled from the chosen period. The Medic DAYS column replaces the time columns and its formulas change to match. Upload the updated files to the `Timesheet Templates` library.
 
+20. **Excel logo (Walter, added during build).** The Admin, Instructor and Medic `.xlsx` templates show the same PEAK-only logo as the web part, replacing "emergency training" and "paramedic services". Re-upload the templates to the library afterwards.
+
 ## Non-goals
 
 - The Expense Report still doesn't produce Excel or send email. It saves to the `ExpenseReports` list as today.

@@ -403,3 +403,31 @@ it('leaves an empty row alone', () => expect(fillDefaultRate('Admin', {}, 30).ra
 - [ ] **Step 4:** The form loads the rates once. If there is no row for the current form type, show `No pay rate is set up for you on this timesheet. Contact accounts.` and disable Submit.
 - [ ] **Step 5:** Provisioning: create `Pay Rates` with the fields above, with item-level read security so each person sees only their own row, and Payroll Owners has Edit. Fill the rows from jeff's list.
 - [ ] **Step 6:** Run `npm test`, expect PASS. Do a manual check: a medic with a PCP level gets `Medic – Level PCP(PSL 9)` on each new row and can change it per shift. Commit: `feat: rates fill from the Pay Rates list`.
+
+### Task 12: Excel templates use the PEAK-only logo (added by Walter mid-run; run right after Task 7)
+
+Today the templates carry older logos: Admin and Instructor show "PEAK emergency training", and Medic shows "PEAK paramedic services" (partly cropped by `<a:srcRect b="18905"/>`). All three must show the same PEAK-only logo the web part uses (`src/webparts/timesheet/assets/peak-logo.jpg`).
+
+**Files:**
+- Modify: `Templates/xlsx/Admin Timesheet Template.xlsx`, `Instructor Timesheet Template.xlsx`, `Medic Timesheet Template.xlsx`. Edit the zip directly, as `scripts/Convert-Templates.ps1` does. Do not round-trip through ExcelJS, and never use Excel COM.
+- Create: `scripts/Update-TemplateLogo.ps1`, safe to rerun, so the change can be repeated if the logo changes.
+- Test: `src/excel/templates.test.ts` (create)
+- Modify: `README.md` (re-upload step)
+
+**Interfaces:** none. Leave the `.xlsm` originals in `Templates/` untouched.
+
+- [ ] **Step 1: Write the failing test.** For each of the three templates, read the zip (ExcelJS `wb.xlsx.readFile`, or `JSZip` if already installed) and check:
+  - the single image's bytes equal `src/webparts/timesheet/assets/peak-logo.jpg`
+  - `xl/drawings/drawing1.xml` has no `srcRect`
+  - the drawing's `a:ext` `cx/cy` ratio is within 2% of the logo's pixel width/height ratio
+- [ ] **Step 2:** Run `npm test`. Expected: FAIL.
+- [ ] **Step 3:** Write the script. For each template:
+  - replace `xl/media/image1.jpeg` with the logo bytes
+  - in `xl/drawings/drawing1.xml`, remove the `srcRect` element
+  - keep the anchor's top-left and width, and set `cy` (and the `to` row offset) so the height matches the logo's aspect ratio
+  - check that the logo still fits inside the header rows above the title. If it doesn't, shrink both `cx` and `cy` proportionally instead.
+
+  Run the script.
+- [ ] **Step 4:** Run `npm test`. Expected: PASS, including the existing definitions and fillTemplate suites.
+- [ ] **Step 5:** README: "After updating, re-upload the three files in `Templates/xlsx` to the Timesheet Templates library."
+- [ ] **Step 6:** Commit: `feat: templates use the PEAK-only logo`.
