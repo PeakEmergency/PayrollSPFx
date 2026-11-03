@@ -47,8 +47,8 @@
 
 The Expense Report fold-in and the spec are uncommitted. Commit them first, so every later diff is reviewable on its own.
 
-- [ ] **Step 1:** `npm test`. Expected: all suites PASS.
-- [ ] **Step 2:** Commit.
+- [x] **Step 1:** `npm test`. Expected: all suites PASS.
+- [x] **Step 2:** Commit.
 
 ```bash
 git add -A
@@ -68,7 +68,7 @@ git commit -m "feat: add Expense Report button that shows the expense report in 
   - `periodLabel(p: PayPeriod): string`
   - `findPeriod(all: PayPeriod[], fromIso: string, toIso: string): PayPeriod | undefined`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 const pp = (year: number, number: number, from: string, to: string): PayPeriod => ({ year, number, from, to });
@@ -88,10 +88,10 @@ it('finds by dates', () => expect(findPeriod([p23, p24], '2026-11-05', '2026-11-
 it('no match is undefined', () => expect(findPeriod([p23], '2026-11-06', '2026-11-18')).toBeUndefined());
 ```
 
-- [ ] **Step 2:** Run `npm test`. Expected: FAIL, because `payPeriods` does not exist.
-- [ ] **Step 3:** Implement the module. Month names are the short English names (`Jan`…`Dec`). Parse dates with string splitting, not `new Date(iso)`, to avoid time zone shifts.
-- [ ] **Step 4:** Run `npm test`. Expected: PASS.
-- [ ] **Step 5:** Commit: `feat: pay period labels and selection`.
+- [x] **Step 2:** Run `npm test`. Expected: FAIL, because `payPeriods` does not exist.
+- [x] **Step 3:** Implement the module. Month names are the short English names (`Jan`…`Dec`). Parse dates with string splitting, not `new Date(iso)`, to avoid time zone shifts.
+- [x] **Step 4:** Run `npm test`. Expected: PASS.
+- [x] **Step 5:** Commit: `feat: pay period labels and selection`.
 
 ### Task 3: Pay Period Schedule list (provisioning and reading)
 
@@ -108,7 +108,7 @@ it('no match is undefined', () => expect(findPeriod([p23], '2026-11-06', '2026-1
   - `class SpPayPeriodSource { constructor(client: SPHttpClient, webUrl: string, listTitle: string); getPayPeriods(): Promise<PayPeriod[]> }`
   - `const PAY_PERIOD_LIST = 'Pay Period Schedule'`, exported from `sharepoint.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('reads a date-only value returned at local midnight in UTC', () =>
@@ -118,18 +118,18 @@ it('reads a value stored at UTC midnight', () =>
   expect(toPayPeriod({ Year: 2026, PeriodNumber: 1, FromDate: '2026-01-01T00:00:00Z', ToDate: '2026-01-14T00:00:00Z' }).from).toBe('2026-01-01'));
 ```
 
-- [ ] **Step 2:** Run `npm test`. Expected: FAIL.
-- [ ] **Step 3:** Implement `toPayPeriod`, which takes the first 10 characters of the date. Peak's sites are in Canadian time zones, west of UTC.
-- [ ] **Step 4:** Implement `getPayPeriods`, which runs `GET items?$select=Year,PeriodNumber,FromDate,ToDate&$top=5000` through the existing `check()` with step name `Loading pay periods`.
-- [ ] **Step 5:** Extend the provisioning script. It creates list `Pay Period Schedule` (BaseTemplate 100) if missing, with fields:
+- [x] **Step 2:** Run `npm test`. Expected: FAIL.
+- [x] **Step 3:** Implement `toPayPeriod`, which takes the first 10 characters of the date. Peak's sites are in Canadian time zones, west of UTC.
+- [x] **Step 4:** Implement `getPayPeriods`, which runs `GET items?$select=Year,PeriodNumber,FromDate,ToDate&$top=5000` through the existing `check()` with step name `Loading pay periods`.
+- [x] **Step 5:** Extend the provisioning script. It creates list `Pay Period Schedule` (BaseTemplate 100) if missing, with fields:
   - `Year` (Number, required)
   - `PeriodNumber` (Number, required)
   - `FromDate`, `ToDate`, `PayrollRun` (DateTime, `Format="DateOnly"`)
 
   Seed 52 rows: period k (0–51) has From = 2026-01-01 + 14k days, To = From + 13, PayrollRun = To + 1, Year = 2026 for k < 26 and otherwise 2027, PeriodNumber = (k % 26) + 1, Title = `YYYY-PP`. Skip a row if one with the same Year and PeriodNumber exists. Write dates as `YYYY-MM-DDT12:00:00Z`.
-- [ ] **Step 6:** Check the seed against both PDFs in `docs/`. The 2026 PP 23 row must be Nov 5–Nov 18 (run Nov 19), 2027 PP 1 must be 2026-12-31 to 2027-01-13, and 2027 PP 26 must be Dec 16–Dec 29. Do this by running the date loop in Node and comparing the three rows.
-- [ ] **Step 7:** Add to README setup: "Rerun `provision-timesheets.js`; it creates and seeds Pay Period Schedule. Add future years as rows in that list."
-- [ ] **Step 8:** Run `npm test`, expect PASS. Commit: `feat: Pay Period Schedule list`.
+- [x] **Step 6:** Check the seed against both PDFs in `docs/`. The 2026 PP 23 row must be Nov 5–Nov 18 (run Nov 19), 2027 PP 1 must be 2026-12-31 to 2027-01-13, and 2027 PP 26 must be Dec 16–Dec 29. Do this by running the date loop in Node and comparing the three rows.
+- [x] **Step 7:** Add to README setup: "Rerun `provision-timesheets.js`; it creates and seeds Pay Period Schedule. Add future years as rows in that list."
+- [x] **Step 8:** Run `npm test`, expect PASS. Commit: `feat: Pay Period Schedule list`.
 
 ### Task 4: Shared pay period picker on the timesheets
 
@@ -144,20 +144,20 @@ it('reads a value stored at UTC midnight', () =>
   - `PayPeriodPicker(props: { id: string; periods: PayPeriod[] | undefined; error?: string; from: string; to: string; disabled?: boolean; onChange(p: PayPeriod): void })`, where `from` and `to` are ISO dates or `''`, and `periods === undefined` means still loading
   - `ITimesheetFormProps.getPayPeriods(): Promise<PayPeriod[]>`
 
-- [ ] **Step 1:** Build `PayPeriodPicker`:
+- [x] **Step 1:** Build `PayPeriodPicker`:
   - A Fluent `Dropdown` labelled `Pay period`, with placeholder `Pick a pay period`.
   - Options come from `selectablePeriods(periods, today)`, keyed `${year}-${number}`.
   - The selected key is `findPeriod(...)` of `from` and `to`.
   - Below it, read-only `From:` and `To:` values in `DD/MM/YY` format. Render them as text, not inputs.
   - When loading fails, show the `error` prop text. When the list is empty, show `No pay periods are set up yet. Contact accounts.`
-- [ ] **Step 2:** In `TimesheetForm`, replace the two `<input type="date">` elements with `PayPeriodPicker`. Load periods once in an effect, and on failure set the error `Pay periods couldn't be loaded: <message>`. `onChange` sets `from` and `to`. Submit stays disabled while `!from || !to`, as today.
-- [ ] **Step 3:** In the web part, pass `getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods()`.
-- [ ] **Step 4:** Run `npm run build`. Expected: package produced, no errors.
+- [x] **Step 2:** In `TimesheetForm`, replace the two `<input type="date">` elements with `PayPeriodPicker`. Load periods once in an effect, and on failure set the error `Pay periods couldn't be loaded: <message>`. `onChange` sets `from` and `to`. Submit stays disabled while `!from || !to`, as today.
+- [x] **Step 3:** In the web part, pass `getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods()`.
+- [x] **Step 4:** Run `npm run build`. Expected: package produced, no errors.
 - [ ] **Step 5: Manual check (hosted workbench, `npm start`):**
   - Dropdown lists PP 23 and earlier, newest first.
   - Picking PP 23 shows From 05/11/26 and To 18/11/26, and neither can be edited.
   - Temporarily renaming the list shows the load error, and Submit stays disabled.
-- [ ] **Step 6:** Commit: `feat: pay period dropdown on timesheets`.
+- [x] **Step 6:** Commit: `feat: pay period dropdown on timesheets`.
 
 ### Task 5: Headings, per diem and Excel layout patching
 
@@ -170,7 +170,7 @@ it('reads a value stored at UTC midnight', () =>
 **Interfaces:**
 - Produces: `applyLayout(ws: ExcelJS.Worksheet, def: TemplateDef): void`, exported from `fillTemplate.ts` and called by `fillTemplate` right after loading. For every column in `def.columns`, it writes `def.columns[i].header` into `${col}${headerRow}`. It keeps each cell's style and turns on wrap text when the header contains `\n`.
 
-- [ ] **Step 1: Update the definitions tests to the new headings**
+- [x] **Step 1: Update the definitions tests to the new headings**
   - Change the per-type test so that it loads the template, calls `applyLayout(ws, def)`, then runs the existing header, group and formula checks.
   - Add:
 
@@ -189,11 +189,11 @@ it('per diem is one day or half day', () => ['Instructor', 'Medic'].forEach((t) 
 }));
 ```
 
-- [ ] **Step 2:** Add a fillTemplate test: fill Admin and read back `F6` = `TOTAL\nHOURS` and `G6` = `PAY\nRATE`; fill Instructor and read back `D7` = `DAYS` and `E7` = `PAY SCALE LEVEL (PSL)`.
-- [ ] **Step 3:** Run `npm test`. Expected: FAIL.
-- [ ] **Step 4:** Change the headings and per diem options and labels in `definitions.ts`. Add `applyLayout` and call it in `fillTemplate`.
-- [ ] **Step 5:** Run `npm test`. Expected: PASS.
-- [ ] **Step 6:** Commit: `feat: renamed headings and half-day per diem`.
+- [x] **Step 2:** Add a fillTemplate test: fill Admin and read back `F6` = `TOTAL\nHOURS` and `G6` = `PAY\nRATE`; fill Instructor and read back `D7` = `DAYS` and `E7` = `PAY SCALE LEVEL (PSL)`.
+- [x] **Step 3:** Run `npm test`. Expected: FAIL.
+- [x] **Step 4:** Change the headings and per diem options and labels in `definitions.ts`. Add `applyLayout` and call it in `fillTemplate`.
+- [x] **Step 5:** Run `npm test`. Expected: PASS.
+- [x] **Step 6:** Commit: `feat: renamed headings and half-day per diem`.
 
 ### Task 6: Medic DAYS replaces start and end times
 
@@ -215,7 +215,7 @@ it('per diem is one day or half day', () => ['Instructor', 'Medic'].forEach((t) 
 - Medic totals: `{ key: 'days', cell: 'F22' }`, travel I22, perDiem J22, amount L22.
 - In the Excel file, columns D and E are hidden, because the `From:` label is merged over F4:G4 and must stay visible. `H${r}` gets formula `F${r}*G${r}`, which Task 7 replaces with the lookup.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // calc.test.ts
@@ -239,14 +239,14 @@ it('medic writes DAYS in F and hides D:E', async () => {
 ```
 
   Update the existing Medic tests that use `start` and `end`.
-- [ ] **Step 2:** Run `npm test`. Expected: FAIL.
-- [ ] **Step 3:** Implement:
+- [x] **Step 2:** Run `npm test`. Expected: FAIL.
+- [x] **Step 3:** Implement:
   - Medic definitions.
   - `calc.ts` Medic branch: `medicTotal = round2(num(days) * num(dayRate))`, and drop `hoursBetween` for Medic.
   - In `validate.ts`, for Instructor and Medic, push `Row N: days missing.` when `dayRate` is set and `days` is not.
   - In `applyLayout`, for Medic: clear `D7` and `E7` and hide D and E. Clear the `F8:F20` formulas, because F is now an input. Set `H8:H20` to `F${r}*G${r}`. Delete `fixMedicFormulas`, but keep its `K20` and `J22` corrections inside `applyLayout`.
-- [ ] **Step 4:** Run `npm test`. Expected: PASS.
-- [ ] **Step 5:** Commit: `feat: medic DAYS column replaces start and end times`.
+- [x] **Step 4:** Run `npm test`. Expected: PASS.
+- [x] **Step 5:** Commit: `feat: medic DAYS column replaces start and end times`.
 
 ### Task 7: PSL shows the level, in the grid and in Excel
 
@@ -262,7 +262,7 @@ it('medic writes DAYS in F and hides D:E', async () => {
   - Medic `dayRate`: `{ labelCol: 'M', amountCol: 'N', firstRow: 6 }`, the existing hidden table M6:N9.
 - The line still stores the dollar amount, so `calc.ts` doesn't change. The grid already shows `optionLabels`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('instructor PSL cell shows the level and the total looks it up', async () => {
@@ -281,14 +281,14 @@ it('medic PSL cell shows the level', async () => {
 });
 ```
 
-- [ ] **Step 2:** Run `npm test`. Expected: FAIL.
-- [ ] **Step 3:** Implement:
+- [x] **Step 2:** Run `npm test`. Expected: FAIL.
+- [x] **Step 3:** Implement:
   - `applyLayout` writes each `levelTable` (labels and amounts from `optionLabels`/`options`) and sets the total formulas: Instructor `F${r}`, Medic `H${r}`, for every grid row.
   - The fill loop writes the label instead of the number for a column with `levelTable`.
   - Remove the template's Medic data-validation lists on G8:G20 and the Instructor ones on E8:E20, if present, because they would reject the label text.
   - Remove the Medic table check in `definitions.test.ts`, since it would now compare the table against itself.
-- [ ] **Step 4:** Run `npm test`. Expected: PASS. Open one filled Medic file in Excel to confirm the totals recalculate.
-- [ ] **Step 5:** Commit: `feat: PSL shows the level in the emailed Excel`.
+- [x] **Step 4:** Run `npm test`. Expected: PASS. Open one filled Medic file in Excel to confirm the totals recalculate.
+- [x] **Step 5:** Commit: `feat: PSL shows the level in the emailed Excel`.
 
 ### Task 8: Expense Report uses the signed-in user and shows only their reports
 
@@ -307,14 +307,14 @@ it('medic PSL cell shows the level', async () => {
 - `IExpenseReportProps` adds `user: { key: string; name: string }` (`key` = `pageContext.user.loginName`, `name` = the same `getCurrentEmployee` name the timesheet shows) and `userEmail: string`.
 - `instructorId` and `instructorName` stay in the model and are filled from `user` on create and on "New report". No data exists to migrate.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - Domain: `validateReport(createReport())` with blank name contains the message above. A report with `instructorName: 'SMITH, A'` has no `instructorId` issue.
   - Storage: `listReports('a@peak.com')` requests a URL containing `$filter=Author/EMail eq 'a%40peak.com'` (or the encoded form the fixture sees) and `$expand=Author`.
   - Remove the roster and instructor tests.
-- [ ] **Step 2:** Run `npm test`. Expected: FAIL.
-- [ ] **Step 3:** Implement the changes above. The web part renders the Expense Report only after the name resolves. Until then it shows `Spinner` with the label `Loading your details…`.
-- [ ] **Step 4:** In the provisioning script, port the ExpenseReports list creation and set `ReadSecurity: 2, WriteSecurity: 2`. Members get Contribute and the `Payroll Owners` group gets Edit, copying the role code in `provision-timesheets.js`. Add a README section.
-- [ ] **Step 5:** Run `npm test`. Expected: PASS. Commit: `feat: expense report uses the signed-in user and lists only their reports`.
+- [x] **Step 2:** Run `npm test`. Expected: FAIL.
+- [x] **Step 3:** Implement the changes above. The web part renders the Expense Report only after the name resolves. Until then it shows `Spinner` with the label `Loading your details…`.
+- [x] **Step 4:** In the provisioning script, port the ExpenseReports list creation and set `ReadSecurity: 2, WriteSecurity: 2`. Members get Contribute and the `Payroll Owners` group gets Edit, copying the role code in `provision-timesheets.js`. Add a README section.
+- [x] **Step 5:** Run `npm test`. Expected: PASS. Commit: `feat: expense report uses the signed-in user and lists only their reports`.
 
 ### Task 9: Expense Report pay period, date picker, logo and table styling
 
@@ -327,12 +327,12 @@ it('medic PSL cell shows the level', async () => {
 - Consumes: `PayPeriodPicker` (Task 4), `formatDateInput` and `parseDateInput` (`domain/dates.ts`)
 - `IExpenseReportProps.getPayPeriods(): Promise<PayPeriod[]>`
 
-- [ ] **Step 1:** Replace the two header date fields with `PayPeriodPicker`. Pass `from={parseDateInput(report.fromDate) || ''}` and set `fromDate`/`toDate` with `formatDateInput(p.from/p.to)` on change. Save stays disabled until a period is set; it already fails validation when the dates are empty.
-- [ ] **Step 2:** In `ExpenseTable`, replace the line date `TextField` with `DateField`, without a label (use `ariaLabel` `Row N date`). The value is still `DD/MM/YY`.
-- [ ] **Step 3:** In the SCSS:
+- [x] **Step 1:** Replace the two header date fields with `PayPeriodPicker`. Pass `from={parseDateInput(report.fromDate) || ''}` and set `fromDate`/`toDate` with `formatDateInput(p.from/p.to)` on change. Save stays disabled until a period is set; it already fails validation when the dates are empty.
+- [x] **Step 2:** In `ExpenseTable`, replace the line date `TextField` with `DateField`, without a label (use `ariaLabel` `Row N date`). The value is still `DD/MM/YY`.
+- [x] **Step 3:** In the SCSS:
   - Add `text-align: center` to `.expenseTable thead th`.
   - Add `font-weight: 400` for the tfoot km and cost cells, via new classes `.plainTotal` on those two `<td>`s.
-- [ ] **Step 4:** Run `npm run build`. Expected: success.
+- [x] **Step 4:** Run `npm run build`. Expected: success.
 - [ ] **Step 5: Manual check:**
   - The header shows the PEAK-only logo.
   - Picking PP 23 sets the read-only dates.
@@ -340,7 +340,7 @@ it('medic PSL cell shows the level', async () => {
   - Headings are centered.
   - The km and cost totals are not bold, and the other totals are still bold.
   - Reopening a saved report selects its period.
-- [ ] **Step 6:** Commit: `feat: expense report pay period dropdown, date picker and styling`.
+- [x] **Step 6:** Commit: `feat: expense report pay period dropdown, date picker and styling`.
 
 ### Task 10: Restyle the timesheets like the Expense Report
 
@@ -350,28 +350,28 @@ it('medic PSL cell shows the level', async () => {
 
 The source of truth is `src/expenseReport/components/ExpenseReport.module.scss`. Copy its values, not new ones.
 
-- [ ] **Step 1:** Header:
+- [x] **Step 1:** Header:
   - The title row uses `.brandRow` values: red `#f00` h1, `clamp(25px, 3.2vw, 38px)`, bold, logo width 158px.
   - The name shows like the `.instructor` dropdown title: bold, `clamp(18px, 2.2vw, 27px)`.
   - `PAY PERIOD` as an h2 in red, 22px, centered, above `PayPeriodPicker`.
   - Surface padding `18px 8px 12px`.
-- [ ] **Step 2:** Buttons:
+- [x] **Step 2:** Buttons:
   - Remove the `.form button` rule.
   - The type picker uses Fluent `DefaultButton`, with `checked` and `toggle` for the active form.
   - Submit is `PrimaryButton`, with text `Submit` or `Sending…`.
   - The Switch and Cancel confirmation uses `PrimaryButton` and `DefaultButton`.
-- [ ] **Step 3:** Grid:
+- [x] **Step 3:** Grid:
   - Header cells: background `#f1f1f1`, 14px bold, centered.
   - Group fills stay as defined.
   - Cell borders `#b2b2b2`, 13px text, row height 36px.
   - Read-only cells: background `#f1f1f1`.
-- [ ] **Step 4:** Totals row: background `#f1f1f1`, colour `#e00000`, bold.
-- [ ] **Step 5:** Messages:
+- [x] **Step 4:** Totals row: background `#f1f1f1`, colour `#e00000`, bold.
+- [x] **Step 5:** Messages:
   - Errors use the `.errorSummary` look: `2px solid #a4262c`, background `#fff4f4`, colour `#73191e`, padding 12px, with a `role="alert"` heading `Can't submit yet`.
   - Success uses Fluent `MessageBar` with `MessageBarType.success`.
-- [ ] **Step 6:** Run `npm run build`. Expected: success.
+- [x] **Step 6:** Run `npm run build`. Expected: success.
 - [ ] **Step 7: Manual check:** put the Admin, Instructor, Medic and Expense Report forms side by side in the workbench. Fonts, header, buttons, borders and totals look the same.
-- [ ] **Step 8:** Commit: `style: timesheets match the expense report look`.
+- [x] **Step 8:** Commit: `style: timesheets match the expense report look`.
 
 ### Task 11: Pay rates from the signed-in user (BLOCKED until jeff's list arrives)
 
@@ -418,21 +418,21 @@ Today the templates carry older logos: Admin and Instructor show "PEAK emergency
 
 **Interfaces:** none. Leave the `.xlsm` originals in `Templates/` untouched.
 
-- [ ] **Step 1: Write the failing test.** For each of the three templates, read the zip (ExcelJS `wb.xlsx.readFile`, or `JSZip` if already installed) and check:
+- [x] **Step 1: Write the failing test.** For each of the three templates, read the zip (ExcelJS `wb.xlsx.readFile`, or `JSZip` if already installed) and check:
   - the single image's bytes equal `src/webparts/timesheet/assets/peak-logo.jpg`
   - `xl/drawings/drawing1.xml` has no `srcRect`
   - the drawing's `a:ext` `cx/cy` ratio is within 2% of the logo's pixel width/height ratio
-- [ ] **Step 2:** Run `npm test`. Expected: FAIL.
-- [ ] **Step 3:** Write the script. For each template:
+- [x] **Step 2:** Run `npm test`. Expected: FAIL.
+- [x] **Step 3:** Write the script. For each template:
   - replace `xl/media/image1.jpeg` with the logo bytes
   - in `xl/drawings/drawing1.xml`, remove the `srcRect` element
   - keep the anchor's top-left and width, and set `cy` (and the `to` row offset) so the height matches the logo's aspect ratio
   - check that the logo still fits inside the header rows above the title. If it doesn't, shrink both `cx` and `cy` proportionally instead.
 
   Run the script.
-- [ ] **Step 4:** Run `npm test`. Expected: PASS, including the existing definitions and fillTemplate suites.
-- [ ] **Step 5:** README: "After updating, re-upload the three files in `Templates/xlsx` to the Timesheet Templates library."
-- [ ] **Step 6:** Commit: `feat: templates use the PEAK-only logo`.
+- [x] **Step 4:** Run `npm test`. Expected: PASS, including the existing definitions and fillTemplate suites.
+- [x] **Step 5:** README: "After updating, re-upload the three files in `Templates/xlsx` to the Timesheet Templates library."
+- [x] **Step 6:** Commit: `feat: templates use the PEAK-only logo`.
 
 ### Task 13: Pay Rates list from the Staff PSL sheet (added by Walter; run before Task 11)
 
@@ -462,12 +462,12 @@ This task only creates and seeds the list. Task 11 must be revised (spec first) 
 | NUEC-B | `RateNUECB` | Currency |
 | Medic PSL | `MedicPSL` | Number (8 to 11) |
 
-- [ ] **Step 1:** In the provisioning script, create the list and fields if they are missing, the same way as Pay Period Schedule. Turn on item-level security (`ReadSecurity: 2, WriteSecurity: 2`) and set Members to Read and `Payroll Owners` to Edit, copying the role code used for Timesheet Submissions. Staff must not be able to change their own rates.
-- [ ] **Step 2:** Seed the 29 rows from the PDF as an inline array (the script runs in the browser console). Skip a row when an item with the same Title already exists, so the script is safe to rerun. Carolyn Nikodym has Medic PSL 9 and no instructor values.
-- [ ] **Step 3:** Fill `Employee` for each seeded row by matching Title against `web/siteusers?$filter=Title eq '<name>'`. Log every name with no match (`Pay Rates: no account for <name>, set Employee by hand`). Do not guess between several matches. Item-level read only works by Author, so the web part reads by `EmployeeId` (Task 11) and staff get read access through Members.
-- [ ] **Step 4:** Check the seed against the PDF in Node: 29 rows; Ben Davies NUEC-A Full = 150 and NUEC-B = 225; Ross Goddard NUEC-A Bridging = 225; Richard Bailey all 0; Tytan Wheeler and William Geise PSL 6 at 340.
-- [ ] **Step 5:** README: "Rerun `provision-timesheets.js`; it creates and seeds Pay Rates. Check the console for staff with no matching account and set their Employee by hand. Accounts maintains rates in that list."
-- [ ] **Step 6:** Commit: `feat: Pay Rates list seeded from the Staff PSL sheet`.
+- [x] **Step 1:** In the provisioning script, create the list and fields if they are missing, the same way as Pay Period Schedule. Turn on item-level security (`ReadSecurity: 2, WriteSecurity: 2`) and set Members to Read and `Payroll Owners` to Edit, copying the role code used for Timesheet Submissions. Staff must not be able to change their own rates.
+- [x] **Step 2:** Seed the 29 rows from the PDF as an inline array (the script runs in the browser console). Skip a row when an item with the same Title already exists, so the script is safe to rerun. Carolyn Nikodym has Medic PSL 9 and no instructor values.
+- [x] **Step 3:** Fill `Employee` for each seeded row by matching Title against `web/siteusers?$filter=Title eq '<name>'`. Log every name with no match (`Pay Rates: no account for <name>, set Employee by hand`). Do not guess between several matches. Item-level read only works by Author, so the web part reads by `EmployeeId` (Task 11) and staff get read access through Members.
+- [x] **Step 4:** Check the seed against the PDF in Node: 29 rows; Ben Davies NUEC-A Full = 150 and NUEC-B = 225; Ross Goddard NUEC-A Bridging = 225; Richard Bailey all 0; Tytan Wheeler and William Geise PSL 6 at 340.
+- [x] **Step 5:** README: "Rerun `provision-timesheets.js`; it creates and seeds Pay Rates. Check the console for staff with no matching account and set their Employee by hand. Accounts maintains rates in that list."
+- [x] **Step 6:** Commit: `feat: Pay Rates list seeded from the Staff PSL sheet`.
 
 **Open questions for Walter (answer before Task 11):**
 1. PSL 6 is $350 for Jesse Hoevenaars but $340 for Tytan Wheeler and William Geise. In the current Instructor dropdown, 340 is PSL 6 and 350 is PSL 7. Which is right?
