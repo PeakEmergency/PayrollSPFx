@@ -45,7 +45,8 @@ export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
     const range = `$${t.labelCol}$${t.firstRow}:$${t.amountCol}$${t.firstRow + (c.options || []).length - 1}`;
     const lookup = (r: number): string => `VLOOKUP(${c.col}${r},${range},2,FALSE)`;
     for (let r = def.firstRow; r < def.firstRow + def.rowCount; r++) {
-      const formula = def.type === 'Medic' ? `F${r}*${lookup(r)}` : `D${r}*${lookup(r)}`;
+      const amount = `${def.type === 'Medic' ? 'F' : 'D'}${r}*${lookup(r)}`;
+      const formula = `IF(${c.col}${r}="",0,${amount})`; // blank PSL gives 0, a bad label still errors
       ws.getCell(`${def.type === 'Medic' ? 'H' : 'F'}${r}`).value = { formula } as ExcelJSType.CellFormulaValue;
       delete validations[`${c.col}${r}`]; // the template list holds amounts and would reject the label
     }
