@@ -377,6 +377,8 @@ The source of truth is `src/expenseReport/components/ExpenseReport.module.scss`.
 
 Do not start until Walter confirms the list contents. If jeff's list doesn't fit the proposed shape below, stop and update the spec first.
 
+**Update:** the Staff PSL sheet arrived and does not fit this shape. See Task 13 and its open questions. Revise the spec and this task before running it.
+
 **Files:**
 - Create: `src/timesheet/rates.ts`, test `src/timesheet/rates.test.ts`
 - Modify: `src/services/sharepoint.ts`, `provisioning/provision-timesheets.js`, `TimesheetGrid.tsx`, `TimesheetForm.tsx`, `TimesheetWebPart.ts`
@@ -431,3 +433,43 @@ Today the templates carry older logos: Admin and Instructor show "PEAK emergency
 - [ ] **Step 4:** Run `npm test`. Expected: PASS, including the existing definitions and fillTemplate suites.
 - [ ] **Step 5:** README: "After updating, re-upload the three files in `Templates/xlsx` to the Timesheet Templates library."
 - [ ] **Step 6:** Commit: `feat: templates use the PEAK-only logo`.
+
+### Task 13: Pay Rates list from the Staff PSL sheet (added by Walter; run before Task 11)
+
+Source: `docs/Staff PSL.pdf` (29 staff). It does not match the shape Task 11 assumed:
+- The instructor rate depends on the **course type** (AP, ASU, NUEC-A FULL, NUEC-A BRIDGING, NUEC-I, NUEC-B). It is not one rate per person. For example, Ben Davies (PSL 2/3) is $225 for AP but $150 for NUEC-A FULL.
+- Instructor PSL can be split (`2/3`), so it is text, not a number.
+- There are no Admin rates.
+- Staff are listed by display name, not by account.
+
+This task only creates and seeds the list. Task 11 must be revised (spec first) to use this shape before it runs.
+
+**Files:**
+- Modify: `provisioning/provision-timesheets.js`, `README.md`
+
+**List `Pay Rates`** (BaseTemplate 100, on the timesheet web). Fields:
+
+| Display name | Internal name | Type |
+|---|---|---|
+| Title (existing) | `Title` | Name as printed on the sheet |
+| Employee | `Employee` | User (people only) |
+| Instructor PSL | `InstructorPSL` | Text (`2/3` allowed; blank if not an instructor) |
+| AP | `RateAP` | Currency |
+| ASU | `RateASU` | Currency |
+| NUEC-A Full | `RateNUECAFull` | Currency |
+| NUEC-A Bridging | `RateNUECABridging` | Currency |
+| NUEC-I | `RateNUECI` | Currency |
+| NUEC-B | `RateNUECB` | Currency |
+| Medic PSL | `MedicPSL` | Number (8 to 11) |
+
+- [ ] **Step 1:** In the provisioning script, create the list and fields if they are missing, the same way as Pay Period Schedule. Turn on item-level security (`ReadSecurity: 2, WriteSecurity: 2`) and set Members to Read and `Payroll Owners` to Edit, copying the role code used for Timesheet Submissions. Staff must not be able to change their own rates.
+- [ ] **Step 2:** Seed the 29 rows from the PDF as an inline array (the script runs in the browser console). Skip a row when an item with the same Title already exists, so the script is safe to rerun. Carolyn Nikodym has Medic PSL 9 and no instructor values.
+- [ ] **Step 3:** Fill `Employee` for each seeded row by matching Title against `web/siteusers?$filter=Title eq '<name>'`. Log every name with no match (`Pay Rates: no account for <name>, set Employee by hand`). Do not guess between several matches. Item-level read only works by Author, so the web part reads by `EmployeeId` (Task 11) and staff get read access through Members.
+- [ ] **Step 4:** Check the seed against the PDF in Node: 29 rows; Ben Davies NUEC-A Full = 150 and NUEC-B = 225; Ross Goddard NUEC-A Bridging = 225; Richard Bailey all 0; Tytan Wheeler and William Geise PSL 6 at 340.
+- [ ] **Step 5:** README: "Rerun `provision-timesheets.js`; it creates and seeds Pay Rates. Check the console for staff with no matching account and set their Employee by hand. Accounts maintains rates in that list."
+- [ ] **Step 6:** Commit: `feat: Pay Rates list seeded from the Staff PSL sheet`.
+
+**Open questions for Walter (answer before Task 11):**
+1. PSL 6 is $350 for Jesse Hoevenaars but $340 for Tytan Wheeler and William Geise. In the current Instructor dropdown, 340 is PSL 6 and 350 is PSL 7. Which is right?
+2. The Instructor timesheet has no course-type column, only `COURSE #`. How should a row pick AP, ASU, NUEC-A and so on? Add a course-type dropdown, or derive it from the course number?
+3. Where do Admin pay rates come from?
