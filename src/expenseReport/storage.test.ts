@@ -260,6 +260,8 @@ describe('own reports only', () => {
     expect(fixture.requests[0].url).toContain('$expand=Author');
     expect(fixture.requests[0].url).toContain("$filter=Author/EMail%20eq%20'a%40peak.com'");
     expect(url).toContain("Author/EMail eq 'a@peak.com'");
+    // SharePoint rejects an expanded lookup in $filter unless it is also in $select (HTTP 400).
+    expect(url).toMatch(/\$select=[^&]*Author\/EMail/);
   });
 });
 

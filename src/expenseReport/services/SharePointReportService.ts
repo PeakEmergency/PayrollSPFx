@@ -108,7 +108,7 @@ export class SharePointReportService implements IReportService {
     return rows;
   }
   public async listReports(ownerEmail: string): Promise<ReportSummary[]> {
-    const rows = await this.collection(`${this.reportsUrl}/items?$expand=Author&$filter=Author/EMail%20eq%20'${literal(ownerEmail)}'&$select=Id,Title,InstructorName,FromDate,ToDate,Modified&$orderby=Modified desc&$top=5000`);
+    const rows = await this.collection(`${this.reportsUrl}/items?$expand=Author&$filter=Author/EMail%20eq%20'${literal(ownerEmail)}'&$select=Id,Title,InstructorName,FromDate,ToDate,Modified,Author/EMail&$orderby=Modified desc&$top=5000`);
     return rows.map(row => ({ id: id(row.Id), title: string(row.Title, 'Title'), instructorName: string(row.InstructorName, 'InstructorName'),
       fromDate: formatDateInput(isoDate(row.FromDate)), toDate: formatDateInput(isoDate(row.ToDate)), modified: string(row.Modified, 'Modified') }));
   }
