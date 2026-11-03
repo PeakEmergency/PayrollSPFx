@@ -95,3 +95,13 @@ it('formula cells carry computed results for previewers that do not recalculate'
   expect(result('J22')).toBe(47);
   expect(result('L22')).toBe(597);
 });
+
+it('applyLayout writes the new headings', async () => {
+  const admin = await fill('Admin', [{}]);
+  expect(admin.getCell('F6').value).toBe('TOTAL\nHOURS');
+  expect(admin.getCell('G6').value).toBe('PAY\nRATE');
+  expect(admin.getCell('F6').alignment?.wrapText).toBe(true);
+  const instr = await fill('Instructor', [{}]);
+  expect(instr.getCell('D7').value).toBe('DAYS');
+  expect(instr.getCell('E7').value).toBe('PAY SCALE LEVEL (PSL)');
+});

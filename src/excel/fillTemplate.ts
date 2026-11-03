@@ -1,7 +1,7 @@
 import type * as ExcelJSType from 'exceljs';
 import { computeLine, computeTotals } from '../timesheet/calc';
 import { TEMPLATES } from '../timesheet/definitions';
-import { Line, TimesheetData } from '../timesheet/types';
+import { Line, TemplateDef, TimesheetData } from '../timesheet/types';
 import { normalizeDate, parseTime, timeToDayFraction, toExcelDate } from '../timesheet/values';
 
 /**
@@ -24,6 +24,15 @@ function fixMedicFormulas(ws: ExcelJSType.Worksheet, firstRow: number, lastRow: 
   ws.getCell('J22').value = { formula: 'SUM(J8:J20)' } as ExcelJSType.CellFormulaValue;
 }
 
+/** Writes the column headings from the definitions into the template header row, keeping cell styles. */
+export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
+  def.columns.forEach((c) => {
+    const cell = ws.getCell(`${c.col}${def.headerRow}`);
+    cell.value = c.header;
+    if (c.header.indexOf('\n') >= 0) cell.alignment = { ...cell.alignment, wrapText: true };
+  });
+}
+
 /** Fills a copy of the stored template. Only cell values change; styles and formats stay. */
 export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): Promise<ArrayBuffer> {
   const ExcelJS = await loadExcelJs();
@@ -31,6 +40,7 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(template);
   const ws = wb.getWorksheet(def.sheetName)!;
+  applyLayout(ws, def);
 
   ws.getCell(def.nameCell).value = data.name;
   if (data.from) ws.getCell(def.fromCell).value = toExcelDate(data.from);

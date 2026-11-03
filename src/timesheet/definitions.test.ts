@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as ExcelJS from 'exceljs';
 import { TEMPLATES } from './definitions';
+import { applyLayout } from '../excel/fillTemplate';
 import { TimesheetType } from './types';
 
 // Compiled to lib-commonjs/timesheet, so the repo root is two levels up.
@@ -18,6 +19,7 @@ describe('definitions match the real templates', () => {
       await wb.xlsx.readFile(path.join(templateDir, def.fileName));
       const ws = wb.getWorksheet(def.sheetName);
       expect(ws).toBeDefined();
+      applyLayout(ws!, def);
 
       // Group headings sit on row 6: merged title over the group's columns, with its fill.
       (def.groups || []).forEach((g) => {
@@ -63,4 +65,18 @@ describe('definitions match the real templates', () => {
   it('medic day rates', () => {
     expect(TEMPLATES.Medic.columns.find((c) => c.key === 'dayRate')!.options).toEqual([250, 350, 450, 550]);
   });
+
+  it('new headings', () => {
+    const h = (t: TimesheetType, k: string): string => TEMPLATES[t].columns.find((c) => c.key === k)!.header;
+    expect(h('Admin', 'hours')).toBe('TOTAL\nHOURS');
+    expect(h('Admin', 'rate')).toBe('PAY\nRATE');
+    expect(h('Instructor', 'days')).toBe('DAYS');
+    expect(h('Instructor', 'dayRate')).toBe('PAY SCALE LEVEL (PSL)');
+  });
+
+  it('per diem is one day or half day', () => ['Instructor', 'Medic'].forEach((t) => {
+    const c = TEMPLATES[t as TimesheetType].columns.find((x) => x.key === 'perDiem')!;
+    expect(c.options).toEqual([47, 23.5]);
+    expect(c.optionLabels).toEqual(['One day ($47.00)', 'Half day ($23.50)']);
+  }));
 });
