@@ -7,10 +7,16 @@
   const LIST_TITLE = 'Timesheet Submissions';
   const LIBRARY_TITLE = 'Timesheet Templates';
 
-  const web = _spPageContextInfo.webAbsoluteUrl;
   const verbose = 'application/json;odata=verbose';
-  const digest = (await (await fetch(`${web}/_api/contextinfo`, { method: 'POST', headers: { Accept: verbose } })).json()).d
-    .GetContextWebInformation.FormDigestValue;
+  // Modern pages and the workbench have no _spPageContextInfo, so take the site from the page address
+  // (everything before /_layouts/, /SitePages/, /Lists/ ...) and let contextinfo return the exact web URL.
+  const here = (location.origin + location.pathname)
+    .split(/\/(?:_layouts|SitePages|Lists|Shared%20Documents|Forms)\//i)[0]
+    .replace(/\/$/, '');
+  const ctxRes = await fetch(`${here}/_api/contextinfo`, { method: 'POST', headers: { Accept: verbose } });
+  if (!ctxRes.ok) throw new Error(`Couldn't read the site from ${here}: ${ctxRes.status}. Run this on a page of the target site.`);
+  const { WebFullUrl: web, FormDigestValue: digest } = (await ctxRes.json()).d.GetContextWebInformation;
+  console.log(`Site: ${web}`);
 
   async function sp(path, { method = 'GET', body, headers = {} } = {}) {
     const res = await fetch(`${web}/_api/${path}`, {
