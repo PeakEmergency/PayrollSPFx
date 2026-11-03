@@ -1,4 +1,4 @@
-import { findPeriod, periodLabel, selectablePeriods, type PayPeriod } from './payPeriods';
+import { findPeriod, periodLabel, selectablePeriods, toPayPeriod, type PayPeriod } from './payPeriods';
 
 const pp = (year: number, number: number, from: string, to: string): PayPeriod => ({ year, number, from, to });
 const p23 = pp(2026, 23, '2026-11-05', '2026-11-18');
@@ -16,4 +16,18 @@ describe('payPeriods', () => {
   it('empty list stays empty', () => expect(selectablePeriods([], '2026-11-20')).toEqual([]));
   it('finds by dates', () => expect(findPeriod([p23, p24], '2026-11-05', '2026-11-18')).toBe(p23));
   it('no match is undefined', () => expect(findPeriod([p23], '2026-11-06', '2026-11-18')).toBeUndefined());
+
+  it('reads a date-only value returned at local midnight in UTC', () =>
+    expect(toPayPeriod({ Year: 2026, PeriodNumber: 23, FromDate: '2026-11-05T07:00:00Z', ToDate: '2026-11-18T07:00:00Z' })).toEqual({
+      year: 2026,
+      number: 23,
+      from: '2026-11-05',
+      to: '2026-11-18'
+    }));
+  it('reads a value stored at UTC midnight', () =>
+    expect(toPayPeriod({ Year: 2026, PeriodNumber: 1, FromDate: '2026-01-01T00:00:00Z', ToDate: '2026-01-14T00:00:00Z' }).from).toBe('2026-01-01'));
+  it('rejects a malformed row', () => {
+    expect(() => toPayPeriod({ Year: 2026, PeriodNumber: NaN, FromDate: '2026-01-01', ToDate: '2026-01-14' })).toThrow(/pay period/i);
+    expect(() => toPayPeriod({ Year: 2026, PeriodNumber: 1, FromDate: '', ToDate: '2026-01-14' })).toThrow(/pay period/i);
+  });
 });

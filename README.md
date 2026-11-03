@@ -38,6 +38,7 @@ The package is `sharepoint/solution/peak-timesheets.sppkg`.
 3. Provision the list and the template library on the site that hosts the web part. Open any page of that site as a site owner, press F12, and paste `provisioning/provision-timesheets.js` into the console (set `ACCOUNTS_GROUP` at the top first). It uses SharePoint REST with your browser login, and is safe to rerun. It creates:
    - `Timesheet Submissions`, with attachments on and item-level security (users read and edit only their own items). The site Members group gets **Contribute** on this list, not Edit, because Edit includes *Manage Lists*, which bypasses item-level security. The accounts group (a SharePoint group) gets **Edit**, so it sees all items. People who submit timesheets must be site Members.
    - `Timesheet Templates`. Upload the three `.xlsx` files from `Templates/xlsx` into it. The script prints the library URL; put it in the web part's template library property if it is not `<site>/Timesheet Templates`.
+   - `Pay Period Schedule`, seeded with the 2026 PP 1 to 2027 PP 26 periods. Rerun `provision-timesheets.js` to create and seed it. Add future years as rows in that list.
 4. Add the app to the site, then add the **Timesheet** web part to a page. Its properties are the recipient email, the list title and the template library URL (leave this blank for `<site>/Timesheet Templates`).
 
 ## Email flow (Power Automate)

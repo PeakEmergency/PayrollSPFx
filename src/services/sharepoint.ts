@@ -1,7 +1,10 @@
 import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
 import { TEMPLATES } from '../timesheet/definitions';
+import { PayPeriod, toPayPeriod } from '../timesheet/payPeriods';
 import { TimesheetType } from '../timesheet/types';
 import { SubmissionRecord, SubmissionStatus, SubmissionStore, TemplateSource } from './submit';
+
+export const PAY_PERIOD_LIST = 'Pay Period Schedule';
 
 const jsonHeaders = {
   Accept: 'application/json;odata=nometadata',
@@ -100,5 +103,23 @@ export class SpTemplateSource implements TemplateSource {
       )
     );
     return res.arrayBuffer();
+  }
+}
+
+export class SpPayPeriodSource {
+  private readonly itemsUrl: string;
+
+  public constructor(private readonly client: SPHttpClient, webUrl: string, listTitle: string) {
+    this.itemsUrl = `${webUrl}/_api/web/lists/getbytitle('${odataString(listTitle)}')/items`;
+  }
+
+  public async getPayPeriods(): Promise<PayPeriod[]> {
+    const res = await check(
+      'Loading pay periods',
+      this.client.get(`${this.itemsUrl}?$select=Year,PeriodNumber,FromDate,ToDate&$top=5000`, SPHttpClient.configurations.v1, {
+        headers: { Accept: 'application/json;odata=nometadata' }
+      })
+    );
+    return (await res.json()).value.map(toPayPeriod);
   }
 }

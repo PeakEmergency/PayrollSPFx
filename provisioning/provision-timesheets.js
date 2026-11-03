@@ -1,4 +1,4 @@
-// Creates the Timesheet Submissions list and the Timesheet Templates library with SharePoint REST.
+// Creates the Timesheet Submissions list, the Timesheet Templates library and the seeded Pay Period Schedule list with SharePoint REST.
 // Run it in the browser console (F12) on a page of the target site, signed in as a site owner.
 // Safe to rerun: anything that already exists is left alone.
 // Afterwards, drag the three files from Templates/xlsx into the Timesheet Templates library.
@@ -106,6 +106,56 @@
     });
     console.log(`Created library '${LIBRARY_TITLE}'`);
   }
+  // --- Pay Period Schedule list: 52 biweekly periods starting 2026-01-01 (2026 PP 1 to 2027 PP 26) ---
+  const PERIOD_LIST = 'Pay Period Schedule';
+  const periods = `web/lists/getbytitle('${PERIOD_LIST}')`;
+  if (await sp(periods)) console.log(`List '${PERIOD_LIST}' exists`);
+  else {
+    await sp('web/lists', { method: 'POST', body: { __metadata: { type: 'SP.List' }, Title: PERIOD_LIST, BaseTemplate: 100 } });
+    console.log(`Created list '${PERIOD_LIST}'`);
+  }
+  const dateField = (name, label) => [name, `<Field Type="DateTime" Name="${name}" StaticName="${name}" DisplayName="${label}" Format="DateOnly" />`];
+  const periodFields = [
+    ['Year', '<Field Type="Number" Name="Year" StaticName="Year" DisplayName="Year" Decimals="0" Required="TRUE" />'],
+    ['PeriodNumber', '<Field Type="Number" Name="PeriodNumber" StaticName="PeriodNumber" DisplayName="Period Number" Decimals="0" Required="TRUE" />'],
+    dateField('FromDate', 'From Date'),
+    dateField('ToDate', 'To Date'),
+    dateField('PayrollRun', 'Payroll Run')
+  ];
+  for (const [name, xml] of periodFields) {
+    if ((await sp(`${periods}/fields?$filter=InternalName eq '${name}'&$select=Id`)).results.length) { console.log(`  field ${name} exists`); continue; }
+    await sp(`${periods}/fields/createfieldasxml`, {
+      method: 'POST',
+      body: { parameters: { __metadata: { type: 'SP.XmlSchemaFieldCreationInformation' }, SchemaXml: xml, Options: 25 } }
+    });
+    console.log(`  added field ${name}`);
+  }
+  const existing = (await sp(`${periods}/items?$select=Year,PeriodNumber&$top=5000`)).results.map((r) => `${r.Year}-${r.PeriodNumber}`);
+  // Noon UTC keeps a date-only field on the same calendar day in any North American time zone.
+  const iso = (base, days) => new Date(base + days * 86400000).toISOString().slice(0, 10) + 'T12:00:00Z';
+  const base = Date.UTC(2026, 0, 1);
+  const itemType = (await sp(`${periods}?$select=ListItemEntityTypeFullName`)).ListItemEntityTypeFullName;
+  let seeded = 0;
+  for (let k = 0; k < 52; k++) {
+    const Year = k < 26 ? 2026 : 2027;
+    const PeriodNumber = (k % 26) + 1;
+    if (existing.includes(`${Year}-${PeriodNumber}`)) continue;
+    await sp(`${periods}/items`, {
+      method: 'POST',
+      body: {
+        __metadata: { type: itemType },
+        Title: `${Year}-${String(PeriodNumber).padStart(2, '0')}`,
+        Year,
+        PeriodNumber,
+        FromDate: iso(base, 14 * k),
+        ToDate: iso(base, 14 * k + 13),
+        PayrollRun: iso(base, 14 * k + 14)
+      }
+    });
+    seeded++;
+  }
+  console.log(`Pay periods: ${seeded} added, ${52 - seeded} already there. Add future years as rows in '${PERIOD_LIST}'.`);
+
   const folder = (await sp(`${lib}/RootFolder?$select=ServerRelativeUrl`)).ServerRelativeUrl;
   console.log(`Done. Upload Templates/xlsx/*.xlsx to ${location.origin}${folder}`);
   console.log(`Template library URL for the web part: ${folder}`);
