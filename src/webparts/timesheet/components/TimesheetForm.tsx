@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { DefaultButton, MessageBar, MessageBarType, PrimaryButton } from '@fluentui/react';
 import styles from './TimesheetForm.module.scss';
 import TimesheetGrid from './TimesheetGrid';
 import logo from '../assets/peak-logo.jpg';
@@ -20,13 +21,6 @@ export interface ITimesheetFormProps {
 }
 
 const types: TimesheetType[] = ['Admin', 'Instructor', 'Medic'];
-
-// Header font sizes (pt) that differ per template: name cell A4 and the PAY PERIOD label.
-const headerSizes: Record<TimesheetType, { name: string; period: string }> = {
-  Admin: { name: '22pt', period: '16pt' },
-  Instructor: { name: '24pt', period: '18pt' },
-  Medic: { name: '24pt', period: '16pt' }
-};
 
 // Totals that are counts or hours, not money.
 const plainTotals: string[] = ['days', 'adminHours', 'deductions', 'hours'];
@@ -111,22 +105,18 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
     <>
     <div className={styles.form}>
       <div className={styles.picker} role="group" aria-label="Form type">
-        <button
-          type="button"
-          className={showExpense ? styles.active : ''}
-          aria-pressed={showExpense}
+        <DefaultButton
+          text="Expense Report"
+          toggle
+          checked={showExpense}
           onClick={() => {
             setShowExpense(true);
             setExpenseOpened(true);
             setPendingType(undefined);
           }}
-        >
-          Expense Report
-        </button>
+        />
         {types.map((t) => (
-          <button key={t} type="button" className={t === type && !showExpense ? styles.active : ''} aria-pressed={t === type && !showExpense} onClick={() => pick(t)}>
-            {t}
-          </button>
+          <DefaultButton key={t} text={t} toggle checked={t === type && !showExpense} onClick={() => pick(t)} />
         ))}
       </div>
 
@@ -134,8 +124,8 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
       {pendingType && (
         <div className={styles.confirm} role="alertdialog" aria-live="assertive">
           Switching to {pendingType} clears the rows you entered.
-          <button type="button" onClick={() => switchTo(pendingType)}>Switch</button>
-          <button type="button" onClick={() => setPendingType(undefined)}>Cancel</button>
+          <PrimaryButton text="Switch" onClick={() => switchTo(pendingType)} />
+          <DefaultButton text="Cancel" onClick={() => setPendingType(undefined)} />
         </div>
       )}
 
@@ -143,13 +133,13 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
         <>
           <div className={styles.header}>
             <div className={styles.titleRow}>
-              <div className={styles.title}>{def.title}</div>
+              <h1 className={styles.title}>{def.title}</h1>
               <img className={styles.logo} src={logo} alt="Peak Emergency" />
             </div>
             <div className={styles.headerRow}>
-              <div className={styles.name} style={{ fontSize: headerSizes[def.type].name }} aria-label="Name">{name}</div>
+              <div className={styles.name} aria-label="Name">{name}</div>
               <div className={styles.period}>
-                <div className={styles.periodLabel} style={{ fontSize: headerSizes[def.type].period }}>PAY PERIOD</div>
+                <h2 className={styles.periodLabel}>PAY PERIOD</h2>
                 <PayPeriodPicker
                   id="pay-period"
                   periods={periods}
@@ -179,25 +169,25 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, submit,
             ))}
           </div>
 
-          <button type="button" className={styles.submit} disabled={submitting || !from || !to} onClick={onSubmit}>
-            {submitting ? 'Sending…' : 'Submit'}
-          </button>
+          <PrimaryButton text={submitting ? 'Sending…' : 'Submit'} disabled={submitting || !from || !to} onClick={onSubmit} />
         </>
       )}
 
       <div aria-live="polite">
         {errors.length > 0 && (
-          <ul className={styles.errors}>
-            {errors.map((e) => (
-              <li key={e}>{e}</li>
-            ))}
-          </ul>
+          <div className={styles.errorSummary} role="alert">
+            <strong>Can&apos;t submit yet</strong>
+            <ul>
+              {errors.map((e) => (
+                <li key={e}>{e}</li>
+              ))}
+            </ul>
+          </div>
         )}
-        {sent && <div className={styles.sent}>{sent}</div>}
+        {sent && <MessageBar messageBarType={MessageBarType.success}>{sent}</MessageBar>}
       </div>
       </div>
     </div>
-    {/* Outside .form so the timesheet button styles don't restyle the Fluent UI controls. */}
     {expenseOpened && <div hidden={!showExpense}>{expenseReport}</div>}
     </>
   );

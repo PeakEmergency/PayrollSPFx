@@ -126,7 +126,7 @@ export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridPr
           columns: cols.map(toColumn),
           nestedHeaders: def.groups ? nestedHeaders(def, cols) : undefined,
           minDimensions: [cols.length, def.rowCount],
-          defaultRowHeight: 37, // template rows are 27.95pt
+          defaultRowHeight: 36, // matches the Expense Report rows
           allowInsertRow: false,
           allowManualInsertRow: false,
           allowDeleteRow: false,
@@ -160,14 +160,14 @@ export default function TimesheetGrid({ def, lines, onChange }: ITimesheetGridPr
     const titles = headRows[headRows.length - 1];
     cols.forEach((c, x) => {
       const td = titles.querySelector<HTMLElement>(`td[data-x="${x}"]`);
-      if (td) td.style.background = groupOf(def, c)?.fill || '#f2f2f2';
+      if (td) td.style.background = groupOf(def, c)?.fill || '#f1f1f1';
     });
     if (def.groups && headRows.length > 1) {
       // First cell is the corner above the row numbers.
       const groupCells = Array.from(headRows[0].querySelectorAll<HTMLElement>('td')).slice(1);
       groupCells.forEach((td) => {
         const g = (def.groups || []).find((x) => x.title === td.textContent?.trim());
-        td.style.background = g ? g.fill : '#f2f2f2';
+        td.style.background = g ? g.fill : '#f1f1f1';
       });
     }
 
