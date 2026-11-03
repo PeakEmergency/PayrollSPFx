@@ -29,11 +29,27 @@ export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
     });
     for (let r = def.firstRow; r < def.firstRow + def.rowCount; r++) {
       ws.getCell(`F${r}`).value = null;
-      ws.getCell(`H${r}`).value = { formula: `F${r}*G${r}` } as ExcelJSType.CellFormulaValue;
     }
     ws.getCell('K20').value = { formula: 'SUM(I20:J20)' } as ExcelJSType.CellFormulaValue;
     ws.getCell('J22').value = { formula: 'SUM(J8:J20)' } as ExcelJSType.CellFormulaValue;
   }
+  // PSL cells hold the level text; a hidden table maps it back to the amount, and the line total looks it up.
+  const validations = (ws as unknown as { dataValidations: { model: Record<string, unknown> } }).dataValidations.model;
+  def.columns.forEach((c) => {
+    const t = c.levelTable;
+    if (!t) return;
+    (c.options || []).forEach((amount, i) => {
+      ws.getCell(`${t.labelCol}${t.firstRow + i}`).value = c.optionLabels![i];
+      ws.getCell(`${t.amountCol}${t.firstRow + i}`).value = amount;
+    });
+    const range = `$${t.labelCol}$${t.firstRow}:$${t.amountCol}$${t.firstRow + (c.options || []).length - 1}`;
+    const lookup = (r: number): string => `VLOOKUP(${c.col}${r},${range},2,FALSE)`;
+    for (let r = def.firstRow; r < def.firstRow + def.rowCount; r++) {
+      const formula = def.type === 'Medic' ? `F${r}*${lookup(r)}` : `D${r}*${lookup(r)}`;
+      ws.getCell(`${def.type === 'Medic' ? 'H' : 'F'}${r}`).value = { formula } as ExcelJSType.CellFormulaValue;
+      delete validations[`${c.col}${r}`]; // the template list holds amounts and would reject the label
+    }
+  });
 }
 
 /** Fills a copy of the stored template. Only cell values change; styles and formats stay. */
@@ -64,7 +80,9 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
         cell.value = String(raw).toUpperCase();
       } else {
         const n = Number(raw);
-        if (!isNaN(n)) cell.value = n;
+        const at = c.levelTable ? (c.options || []).indexOf(n) : -1;
+        if (at >= 0) cell.value = c.optionLabels![at];
+        else if (!isNaN(n)) cell.value = n;
       }
     });
   });

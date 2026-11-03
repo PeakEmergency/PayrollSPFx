@@ -54,8 +54,8 @@ it('medic writes DAYS in F and hides D:E', async () => {
   expect(ws.getColumn('D').hidden && ws.getColumn('E').hidden).toBe(true);
   expect(ws.getCell('F22').formula).toBe('SUM(F8:F20)');
   expect(ws.getCell('F9').formula).toBeFalsy();
-  expect(ws.getCell('H8').formula).toBe('F8*G8');
-  expect(ws.getCell('H19').formula).toBe('F19*G19');
+  expect(ws.getCell('H8').formula).toBe('F8*VLOOKUP(G8,$M$6:$N$9,2,FALSE)');
+  expect(ws.getCell('H19').formula).toBe('F19*VLOOKUP(G19,$M$6:$N$9,2,FALSE)');
   expect(ws.getCell('K20').formula).toBe('SUM(I20:J20)');
   expect(ws.getCell('J22').formula).toBe('SUM(J8:J20)');
 });
@@ -101,4 +101,20 @@ it('applyLayout writes the new headings', async () => {
   const instr = await fill('Instructor', [{}]);
   expect(instr.getCell('D7').value).toBe('DAYS');
   expect(instr.getCell('E7').value).toBe('PAY SCALE LEVEL (PSL)');
+});
+
+it('instructor PSL cell shows the level and the total looks it up', async () => {
+  const ws = await fill('Instructor', [{ date: '2026-10-15', course: 'A1', days: 1, dayRate: 225 }]);
+  expect(ws.getCell('E8').value).toBe('Instructor – Level 1 (PSL 3)');
+  expect(ws.getCell('F8').formula).toBe('D8*VLOOKUP(E8,$N$8:$O$14,2,FALSE)');
+  expect(ws.getCell('N10').value).toBe('Instructor – Level 1 (PSL 3)');
+  expect(ws.getCell('O10').value).toBe(225);
+  expect((ws.getCell('F8').value as { result?: number }).result).toBe(225);
+});
+
+it('medic PSL cell shows the level', async () => {
+  const ws = await fill('Medic', [{ date: '2026-10-15', client: 'X', days: 0.5, dayRate: 350 }]);
+  expect(ws.getCell('G8').value).toBe('Medic – Level PCP(PSL 9)');
+  expect(ws.getCell('H8').formula).toBe('F8*VLOOKUP(G8,$M$6:$N$9,2,FALSE)');
+  expect((ws.getCell('H8').value as { result?: number }).result).toBe(175);
 });

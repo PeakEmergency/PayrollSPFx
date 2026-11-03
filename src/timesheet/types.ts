@@ -11,6 +11,8 @@ export interface ColumnDef {
   options?: number[];
   /** Shown in the dropdown instead of the amount, same order as options. */
   optionLabels?: string[];
+  /** Hidden lookup table the sheet writes (labels and amounts), so the cell shows the level and the total looks it up. */
+  levelTable?: { labelCol: string; amountCol: string; firstRow: number };
   width: number;
 }
 

@@ -55,6 +55,7 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       {
         ...col('dayRate', 'E', 'PAY SCALE LEVEL (PSL)', 'dropdown', 14.29, [0, 150, 225, 280, 320, 340, 350]),
         // Classifications from Peak Emergency (the template has only the amounts, XFC2:XFC8).
+        levelTable: { labelCol: 'N', amountCol: 'O', firstRow: 8 },
         optionLabels: [
           'Instructor – Level Candidate (PSL 1)',
           'Instructor – Level Mentee (PSL 2)',
@@ -105,7 +106,7 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       col('days', 'F', 'DAYS', 'dropdown', 10.71, [0.5, 1]),
       {
         ...col('dayRate', 'G', 'PSL', 'dropdown', 10, [250, 350, 450, 550]),
-        // Template lookup table M6:N9.
+        levelTable: { labelCol: 'M', amountCol: 'N', firstRow: 6 },
         optionLabels: [
           'Medic – Level NUEC-A/AP (PSL 8)',
           'Medic – Level PCP(PSL 9)',

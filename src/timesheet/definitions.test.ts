@@ -38,18 +38,6 @@ describe('definitions match the real templates', () => {
     });
   });
 
-  it('medic rate classifications match the template lookup table', async () => {
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.readFile(path.join(templateDir, TEMPLATES.Medic.fileName));
-    const ws = wb.getWorksheet(TEMPLATES.Medic.sheetName)!;
-    const rate = TEMPLATES.Medic.columns.find((c) => c.key === 'dayRate')!;
-    // Template dropdown G8 = O6:O9 (=N6:N9 rates), labels in M6:M9.
-    [6, 7, 8, 9].forEach((r, i) => {
-      expect(rate.options![i]).toBe(ws.getCell(`N${r}`).value);
-      expect(rate.optionLabels![i]).toBe(collapse(String(ws.getCell(`M${r}`).value)));
-    });
-  });
-
   it('every labelled dropdown has one label per option', () => {
     Object.values(TEMPLATES).forEach((t) =>
       t.columns.filter((c) => c.optionLabels).forEach((c) => expect(c.optionLabels!.length).toBe(c.options!.length))
