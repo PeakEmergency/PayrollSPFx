@@ -42,11 +42,11 @@ export default function ExpenseTable({ report, instanceId, disabled, issues, onC
           <th rowSpan={2} scope="col" id={header('amount')} className={styles.amountHeading}>AMOUNT</th></tr>
         <tr><th scope="col" id={header('start')} className={styles.mileageStart}>START<small>CITY &amp; POSTAL CODE</small></th>
           <th scope="col" id={header('end')} className={styles.mileageHeading}>END<small>CITY &amp; POSTAL CODE</small></th>
-          <th scope="col" id={header('km')} className={styles.mileageHeading}>TOTAL<br />km</th>
+          <th scope="col" id={header('km')} className={styles.mileageHeading}>TOTAL<br /><span className={styles.plainHeading}>km</span></th>
           <th scope="col" id={header('mileageTotal')} className={styles.mileageHeading}>TOTAL</th>
           <th scope="col" id={header('description')} className={styles.otherStart}>DESCRIPTION</th>
           <th scope="col" id={header('gst')} className={styles.otherHeading}>GST</th>
-          <th scope="col" id={header('cost')} className={styles.otherHeading}>COST<br />(excl. GST)</th></tr>
+          <th scope="col" id={header('cost')} className={styles.otherHeading}>COST<br /><span className={styles.plainHeading}>(excl. GST)</span></th></tr>
       </thead>
       <tbody>{report.lines.map((line, index) => <tr key={line.id}>
         <td headers={header('date')} className={styles.dateCell}>{dateInput(index)}</td>

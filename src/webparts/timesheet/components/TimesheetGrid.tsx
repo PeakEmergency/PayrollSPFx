@@ -32,7 +32,9 @@ function toColumn(c: ColumnDef): jspreadsheet.Column {
   const base = { title: c.header, width: Math.max(c.width + 5, 90), align: 'center' as const };
   switch (c.kind) {
     case 'date':
-      return { ...base, type: 'calendar', options: { format: 'DD/MM/YY' } };
+      // position (missing from the typings) makes jSuites use position: fixed, so the grid's overflow can't clip it.
+      return { ...base, type: 'calendar',
+        options: { format: 'DD/MM/YY', position: true } as { format: string } };
     case 'dropdown':
       return {
         ...base,

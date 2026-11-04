@@ -27,6 +27,7 @@ export default function PayPeriodPicker({ id, periods, error, from, to, disabled
       <Dropdown
         id={id}
         label="Pay period"
+        dropdownWidth="auto"
         placeholder="Pick a pay period"
         options={options}
         selectedKey={selected ? key(selected) : null}
