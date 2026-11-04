@@ -3,7 +3,7 @@
   "solution": {
     "name": "peak-timesheets-client-side-solution",
     "id": "544eb67d-1517-467c-aa92-daf703e18ac1",
-    "version": "1.0.5.0",
+    "version": "1.0.6.0",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "webApiPermissionRequests": [
@@ -32,7 +32,7 @@
         "title": "peak-timesheets Feature",
         "description": "The feature that activates elements of the peak-timesheets solution.",
         "id": "ee92017d-8d6a-4f4c-84e9-0cb9d46f260a",
-        "version": "1.0.5.0"
+        "version": "1.0.6.0"
       }
     ]
   },
