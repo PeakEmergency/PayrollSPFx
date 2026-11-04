@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { DefaultButton, Dropdown, MessageBar, MessageBarType, PrimaryButton, Spinner, SpinnerSize, ThemeProvider, createTheme } from '@fluentui/react';
+import { DefaultButton, Dropdown, IDropdownOption, MessageBar, MessageBarType, PrimaryButton, Spinner, SpinnerSize, ThemeProvider, createTheme } from '@fluentui/react';
 import { IReportService } from '../services/IReportService';
 import { ExpenseLine, ExpenseReport as Report, ReceiptInfo, ReportSummary } from '../domain/models';
 import { createReport, validateReport } from '../domain/report';
@@ -8,6 +8,7 @@ import PayPeriodPicker from '../../webparts/timesheet/components/PayPeriodPicker
 import Receipts from './Receipts';
 import peakLogo from '../../webparts/timesheet/assets/peak-logo.jpg';
 import { PayPeriod } from '../../timesheet/payPeriods';
+import { Employee } from '../../services/sharepoint';
 import { formatDateInput, parseDateInput } from '../domain/dates';
 import styles from './ExpenseReport.module.scss';
 
@@ -16,7 +17,7 @@ const confirmationStyles = styles as unknown as Record<string, string>;
 export interface IExpenseReportProps {
   service: IReportService;
   defaultRate: string;
-  user: { key: string; name: string };
+  getEmployees(): Promise<Employee[]>;
   userEmail: string;
   getPayPeriods(): Promise<PayPeriod[]>;
   instanceId: string;
@@ -34,8 +35,9 @@ const sameInputs = (left: Report, right: Report): boolean => {
 };
 
 export default function ExpenseReport(props: IExpenseReportProps): React.ReactElement {
-  const [report, setReport] = React.useState<Report>(() => createReport(props.defaultRate, props.user));
+  const [report, setReport] = React.useState<Report>(() => createReport(props.defaultRate));
   const [baseline, setBaseline] = React.useState(() => JSON.stringify(report));
+  const [employees, setEmployees] = React.useState<Employee[]>([]);
   const [reports, setReports] = React.useState<ReportSummary[]>([]);
   const [receipts, setReceipts] = React.useState<ReceiptInfo[]>([]);
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
@@ -73,9 +75,11 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
   React.useEffect(() => {
     let active = true;
     setLoading(true); setLoadError(''); setListError('');
+    const roster = props.getEmployees().then(items => { if (active) setEmployees(items); })
+      .catch(error => { if (active) setLoadError(`Employees couldn't be loaded: ${errorText(error)}`); });
     const list = props.service.listReports(props.userEmail).then(items => { if (active) setReports(items); })
       .catch(error => { if (active) setListError(errorText(error)); });
-    list.then(() => { if (active) setLoading(false); }).catch(() => undefined);
+    Promise.all([roster, list]).then(() => { if (active) setLoading(false); }).catch(() => undefined);
     return () => { active = false; };
   }, [props.service, reload]);
 
@@ -158,7 +162,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     if (busyRef.current) return;
     setPendingAction(undefined);
     if (action.type === 'new') {
-      const blank = createReport(props.defaultRate, props.user);
+      const blank = createReport(props.defaultRate);
       setReport(blank); setBaseline(JSON.stringify(blank)); setReceipts([]); setPendingFiles([]); setSaveUncertain(false);
       setSelectedReportId(undefined); setShowValidation(false); setOperationError(''); setStatus('');
       return;
@@ -176,6 +180,11 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     if (busyRef.current) return;
     if (dirty) setPendingAction(action); else performAction(action).catch(error => setOperationError(errorText(error)));
   };
+  const options: IDropdownOption[] = employees.map(person => ({ key: person.key, text: person.name }));
+  // A saved report keeps its name even if that person has left the list.
+  if (report.instructorId && !options.some(option => option.key === report.instructorId)) {
+    options.push({ key: report.instructorId, text: report.instructorName, disabled: true });
+  }
   const issue = (field: string): string | undefined => issues.find(item => item.field === field)?.message;
 
   return <ThemeProvider theme={props.isDarkTheme ? darkTheme : undefined} className={`${styles.expenseReport} ${props.isDarkTheme ? styles.dark : ''}`}>
@@ -186,8 +195,13 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
         <img className={styles.logo} src={peakLogo} alt="Peak Emergency" />
       </div>
       <div className={styles.reportHeader}>
-        <div className={styles.instructor}><div>Instructor</div><strong style={{ fontSize: 24 }}>{report.instructorName || '—'}</strong>
-          {issue('instructorId') && <div role="alert" style={{ color: '#a4262c' }}>{issue('instructorId')}</div>}</div>
+        <Dropdown id={`${props.instanceId}-instructor`} label="Instructor" className={styles.instructor}
+          placeholder="PICK FROM DROPDOWN" selectedKey={report.instructorId || null} options={options}
+          disabled={loading || locked || !employees.length} required errorMessage={issue('instructorId')}
+          onChange={(_, option) => {
+            if (busyRef.current || !option || option.disabled) return;
+            setReport(current => ({ ...current, instructorId: String(option.key), instructorName: option.text })); setStatus('');
+          }} />
         <div className={styles.printInstructor}><span>Instructor</span><strong>{report.instructorName || '—'}</strong></div>
         <section className={styles.payPeriod} aria-labelledby={`${props.instanceId}-pay-period`}>
           <h2 id={`${props.instanceId}-pay-period`}>PAY PERIOD</h2>
@@ -199,7 +213,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
         </section>
       </div>
       <div className={styles.noPrint}>
-        {loading && <Spinner size={SpinnerSize.small} label="Loading saved reports…" />}
+        {loading && <Spinner size={SpinnerSize.small} label="Loading employees and saved reports…" />}
         {(loadError || listError) && <MessageBar messageBarType={MessageBarType.error} isMultiline>
           {loadError && <p>{loadError}</p>}{listError && <p>{listError}</p>}
           <DefaultButton text="Retry loading" disabled={locked || loading} onClick={() => setReload(value => value + 1)} />

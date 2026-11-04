@@ -101,8 +101,8 @@ describe('save validation', () => {
     expect(issues.every(issue => issue.message.length > 0)).toBe(true);
   });
 
-  it('asks for a refresh when the signed-in name is blank, and accepts a name', () => {
-    expect(validateReport(createReport())).toContainEqual({ field: 'instructorId', message: "Your name couldn't be loaded. Refresh the page." });
+  it('asks for a name from the dropdown, and accepts a name', () => {
+    expect(validateReport(createReport())).toContainEqual({ field: 'instructorId', message: 'Pick your name from the Instructor dropdown.' });
     const report = validHeader(); report.instructorName = 'SMITH, A';
     expect(validateReport(report).some(issue => issue.field === 'instructorId')).toBe(false);
   });

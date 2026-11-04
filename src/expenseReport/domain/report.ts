@@ -12,9 +12,9 @@ function newIdentity(): string {
   return Date.now().toString(36) + '-' + identitySequence.toString(36) + '-' + Math.random().toString(36).slice(2);
 }
 
-export function createReport(rate: string = '0.48', user: { key: string; name: string } = { key: '', name: '' }): ExpenseReport {
+export function createReport(rate: string = '0.48'): ExpenseReport {
   return {
-    schemaVersion: 1, clientId: newIdentity(), instructorId: user.key, instructorName: user.name, fromDate: '', toDate: '',
+    schemaVersion: 1, clientId: newIdentity(), instructorId: '', instructorName: '', fromDate: '', toDate: '',
     lines: Array.from({ length: EXPENSE_LINE_COUNT }, () => ({
       id: newIdentity(), date: '', startCity: '', endCity: '', kilometres: '', rate, description: '', gst: '', cost: ''
     }))
@@ -24,7 +24,7 @@ export function createReport(rate: string = '0.48', user: { key: string; name: s
 export function validateReport(report: ExpenseReport): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (!report.instructorName.trim()) {
-    issues.push({ field: 'instructorId', message: "Your name couldn't be loaded. Refresh the page." });
+    issues.push({ field: 'instructorId', message: 'Pick your name from the Instructor dropdown.' });
   }
   const from = parseDateInput(report.fromDate);
   const to = parseDateInput(report.toDate);

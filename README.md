@@ -1,6 +1,6 @@
 # peak-timesheets
 
-SharePoint Framework web part for Peak Emergency timesheets. The signed-in user picks Admin, Instructor or Medic, fills in a grid laid out like the Excel template, and submits. On submit the web part:
+SharePoint Framework web part for Peak Emergency timesheets. The user picks Admin, Instructor or Medic, picks their name from the `Employees` list, fills in a grid laid out like the Excel template, and submits. On submit the web part:
 
 1. records the submission in the `Timesheet Submissions` list (status `Pending`), with the email's To, Subject and Body ready in hidden columns;
 2. fills a copy of the real template from the `Timesheet Templates` library and attaches it to the list item;
@@ -13,7 +13,7 @@ Design: `docs/superpowers/specs/2026-10-30-timesheet-webpart-design.md`.
 ## Prerequisites
 
 - SPFx 1.24.0. Node.js 22 LTS (`>=22.14.0 <23`), see the [SPFx compatibility table](https://learn.microsoft.com/sharepoint/dev/spfx/compatibility).
-- A SharePoint tenant app catalog, and a tenant admin to approve the Graph permissions.
+- A SharePoint tenant app catalog.
 
 Keep the repo out of OneDrive sync if you can: OneDrive locks files in `node_modules`, `jest-output` and `lib*`, which makes `npm install` very slow and can make builds fail with `EPERM`.
 
@@ -34,17 +34,20 @@ npm run build     # production build + package-solution
 The package is `sharepoint/solution/peak-timesheets.sppkg`.
 
 1. Upload the `.sppkg` to the tenant app catalog and deploy it.
-2. Approve the API access: SharePoint admin center → **Advanced** → **API access**. Approve `Microsoft Graph` · `User.Read` (used to read the submitter's name).
-3. Provision the list and the template library on the site that hosts the web part. Open any page of that site as a site owner, press F12, and paste `provisioning/provision-timesheets.js` into the console (set `ACCOUNTS_GROUP` at the top first). It uses SharePoint REST with your browser login, and is safe to rerun. It creates:
+2. Provision the list and the template library on the site that hosts the web part. Open any page of that site as a site owner, press F12, and paste `provisioning/provision-timesheets.js` into the console (set `ACCOUNTS_GROUP` at the top first). It uses SharePoint REST with your browser login, and is safe to rerun. It creates:
    - `Timesheet Submissions`, with attachments on and item-level security (users read and edit only their own items). The site Members group gets **Contribute** on this list, not Edit, because Edit includes *Manage Lists*, which bypasses item-level security. The accounts group (a SharePoint group) gets **Edit**, so it sees all items. People who submit timesheets must be site Members.
    - `Timesheet Templates`. Upload the three `.xlsx` files from `Templates/xlsx` into it. The script prints the library URL; put it in the web part's template library property if it is not `<site>/Timesheet Templates`.
    - `Pay Period Schedule`, seeded with the 2026 PP 1 to 2027 PP 26 periods. Rerun `provision-timesheets.js` to create and seed it. Add future years as rows in that list.
-   - `Pay Rates`, seeded with the 29 staff from `docs/Staff PSL.pdf` (Instructor PSL, the six course rates AP, ASU, NUEC-A Full, NUEC-A Bridging, NUEC-I, NUEC-B, and Medic PSL) and the three hourly admin staff (Admin Rate). Salaried staff have no Admin Rate and don't submit admin timesheets. The timesheet fills each row's rate from the signed-in person's row: Admin Rate, the Medic PSL amount, or the instructor rate for the course type read from the course # (`AP-…`, `ASU-…`, `NUEC-A-…F`, `NUEC-A-…B`, `NUEC-I-…`, `NUEC-B-…`). A course # in any other format can't be submitted. Someone with no rate for a form sees "No pay rate is set up for you on this timesheet" and can't submit. The script matches each name to an account by display name. Names it can't match are logged as warnings; set their **Employee** by hand and rerun the script. Each row is readable only by its Employee, the accounts group (Edit) and site owners, so staff can't see each other's rates or change their own. Accounts keeps the rates up to date in that list.
-4. Add the app to the site, then add the **Timesheet** web part to a page. Its properties are the recipient email, the list title and the template library URL (leave this blank for `<site>/Timesheet Templates`).
+   - `Pay Rates`, seeded with the 29 staff from `docs/Staff PSL.pdf` (Instructor PSL, the six course rates AP, ASU, NUEC-A Full, NUEC-A Bridging, NUEC-I, NUEC-B, and Medic PSL) and the three hourly admin staff (Admin Rate). Salaried staff have no Admin Rate and don't submit admin timesheets. The timesheet fills each row's rate from the row of the person picked in the name dropdown, matched by name (`Rosie Trinh` in Pay Rates matches `TRINH, ROSIE` in Employees; a nickname in brackets is ignored): Admin Rate, the Medic PSL amount, or the instructor rate for the course type read from the course # (`AP-…`, `ASU-…`, `NUEC-A-…F`, `NUEC-A-…B`, `NUEC-I-…`, `NUEC-B-…`). A course # in any other format can't be submitted. Someone with no rate for a form sees "No pay rate is set up for NAME on this timesheet" and can't submit. Picking another name refills the rate on every entered row. Site Members can read every row (any of them can see everyone's rates); only the accounts group can edit. The **Employee** column is no longer used. Accounts keeps the rates up to date in that list.
+3. Add the app to the site, then add the **Timesheet** web part to a page. Its properties are the recipient email, the list title and the template library URL (leave this blank for `<site>/Timesheet Templates`).
 
 ## Expense reports list
 
-The Expense Report button uses the `ExpenseReports` list. Create it by pasting `provisioning/provision-expense-reports.js` into the browser console on `https://peakemergency.sharepoint.com` as a site owner (safe to rerun). It sets item-level security (users read and edit only their own reports), gives site Members Contribute and the `Payroll Owners` group Edit. Each user sees only reports they created, and the name on the report is their signed-in name. The Instructors list is no longer used and can be deleted.
+The Expense Report button uses the `ExpenseReports` list. Create it by pasting `provisioning/provision-expense-reports.js` into the browser console on `https://peakemergency.sharepoint.com` as a site owner (safe to rerun). It sets item-level security (users read and edit only their own reports), gives site Members Contribute and the `Payroll Owners` group Edit. Each user sees only reports they created. The name on the report is picked from the `Employees` list.
+
+## Employees list
+
+The name dropdown on every timesheet and the expense report lists the `Employees` list on the site (formerly `Instructors`): **Title** is the name as `LAST, FIRST`, **InstructorKey** a unique key (`instructor-NN`, saved with expense reports), and **Active** hides people who have left when set to No. Add new staff there, and give them a `Pay Rates` row with the same name.
 
 ## Email flow (Power Automate)
 

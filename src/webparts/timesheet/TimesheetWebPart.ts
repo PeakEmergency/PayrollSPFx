@@ -4,15 +4,14 @@ import { Version } from '@microsoft/sp-core-library';
 import { type IPropertyPaneConfiguration, PropertyPaneTextField } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import { type IReadonlyTheme } from '@microsoft/sp-component-base';
-import { MSGraphClientV3, SPHttpClient } from '@microsoft/sp-http';
-import { MessageBar, MessageBarType, Spinner, ThemeProvider, createTheme, initializeIcons, type ITheme } from '@fluentui/react';
+import { SPHttpClient } from '@microsoft/sp-http';
+import { ThemeProvider, createTheme, initializeIcons, type ITheme } from '@fluentui/react';
 import ExpenseReport from '../../expenseReport/components/ExpenseReport';
 import { SharePointReportService } from '../../expenseReport/services/SharePointReportService';
 
 import * as strings from 'TimesheetWebPartStrings';
 import TimesheetForm, { ITimesheetFormProps } from './components/TimesheetForm';
-import { getCurrentEmployee } from '../../services/graph';
-import { PAY_PERIOD_LIST, PAY_RATE_LIST, SpPayPeriodSource, SpPayRateSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
+import { EMPLOYEE_LIST, Employee, PAY_PERIOD_LIST, PAY_RATE_LIST, SpEmployeeSource, SpPayPeriodSource, SpPayRateSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
 import { submitTimesheet } from '../../services/submit';
 
 export interface ITimesheetWebPartProps {
@@ -27,13 +26,10 @@ export interface ITimesheetWebPartProps {
 
 export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWebPartProps> {
   private _root: Root | undefined;
-  private _graph: Promise<MSGraphClientV3> | undefined;
+  private _employees: Promise<Employee[]> | undefined;
   private _expenseService: SharePointReportService | undefined;
   private _expenseKey = '';
   private _theme: ITheme | undefined;
-  private _userName: string | undefined;
-  private _userNameError = '';
-  private _userNameRequested = false;
 
   protected async onInit(): Promise<void> {
     await super.onInit();
@@ -41,18 +37,6 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
   }
 
   private renderExpenseReport(): React.ReactElement {
-    if (this._userName === undefined) {
-      if (!this._userNameRequested) {
-        this._userNameRequested = true;
-        this.graph.then(getCurrentEmployee).then(
-          name => { this._userName = name; this.render(); },
-          (err: Error) => { this._userNameError = err.message; this.render(); }
-        ).catch(() => undefined);
-      }
-      return this._userNameError
-        ? React.createElement(MessageBar, { messageBarType: MessageBarType.error }, `Your name couldn't be loaded. Refresh the page. (${this._userNameError})`)
-        : React.createElement(Spinner, { label: 'Loading your details…' });
-    }
     const siteUrl = (this.properties.expenseSiteUrl || this.context.pageContext.web.absoluteUrl).replace(/\/$/, '');
     const reportsListTitle = this.properties.reportsListTitle || 'ExpenseReports';
     const key = JSON.stringify([siteUrl, reportsListTitle]);
@@ -79,7 +63,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
         key,
         service: this._expenseService,
         defaultRate: this.properties.defaultRate || '0.48',
-        user: { key: this.context.pageContext.user.loginName, name: this._userName },
+        getEmployees: this.getEmployees,
         userEmail: this.context.pageContext.user.email,
         getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, this.context.pageContext.web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods(),
         instanceId: this.instanceId,
@@ -94,15 +78,16 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
     if (this._root) this.render();
   }
 
-  private get graph(): Promise<MSGraphClientV3> {
-    this._graph =
-      this._graph ||
-      this.context.msGraphClientFactory.getClient('3').catch((err: Error) => {
-        this._graph = undefined; // retry on the next call
-        throw new Error(`Connecting to Microsoft Graph failed: ${err.message}`);
+  /** One load shared by both forms; a failure retries on the next call. */
+  private getEmployees = (): Promise<Employee[]> => {
+    this._employees =
+      this._employees ||
+      new SpEmployeeSource(this.context.spHttpClient, this.context.pageContext.web.absoluteUrl, EMPLOYEE_LIST).getEmployees().catch((err: Error) => {
+        this._employees = undefined;
+        throw err;
       });
-    return this._graph;
-  }
+    return this._employees;
+  };
 
   public render(): void {
     const web = this.context.pageContext.web;
@@ -111,10 +96,9 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
 
     const props: ITimesheetFormProps = {
       emailTo,
-      getName: async () => getCurrentEmployee(await this.graph),
+      getEmployees: this.getEmployees,
       getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods(),
-      getPayRates: () =>
-        new SpPayRateSource(this.context.spHttpClient, web.absoluteUrl, PAY_RATE_LIST).getMyRates(this.context.pageContext.legacyPageContext.userId),
+      getPayRates: () => new SpPayRateSource(this.context.spHttpClient, web.absoluteUrl, PAY_RATE_LIST).getAllRates(),
       submit: async (data) =>
         submitTimesheet(data, {
           store: new SpSubmissionStore(this.context.spHttpClient, web.absoluteUrl, listTitle),

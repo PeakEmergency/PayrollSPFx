@@ -163,8 +163,7 @@
   console.log(`Pay periods: ${seeded} added, ${52 - seeded} already there. Add future years as rows in '${PERIOD_LIST}'.`);
 
   // --- Pay Rates list: one row per person, seeded from docs/Staff PSL.pdf ---
-  // Each item is readable only by its Employee (plus Payroll Owners and site owners), so staff
-  // can't see each other's rates or change their own. After setting an Employee by hand, rerun the script.
+  // Members read every row (the timesheet picks the person by name from the Employees list); only Payroll Owners edit.
   const RATE_LIST = 'Pay Rates';
   const rates = `web/lists/getbytitle('${RATE_LIST}')`;
   if (await sp(rates)) console.log(`List '${RATE_LIST}' exists`);
@@ -269,11 +268,9 @@
   }
   console.log(`Pay rates: ${rateAdded} added, ${rows.length - rateAdded} already there`);
 
-  // List: Members read only (items narrow it further), Payroll Owners edit.
+  // List: Members read only, Payroll Owners edit.
   const read = await roleId('Read');
-  const fullControl = await roleId('Full Control');
   const members = await sp('web/AssociatedMemberGroup');
-  const owners = await sp('web/AssociatedOwnerGroup');
   if (!(await sp(`${rates}?$select=HasUniqueRoleAssignments`)).HasUniqueRoleAssignments) {
     await sp(`${rates}/breakroleinheritance(copyRoleAssignments=true,clearSubscopes=true)`, { method: 'POST' });
     await sp(`${rates}/roleassignments/removeroleassignment(principalid=${members.Id},roledefid=${edit})`, { method: 'POST' });
@@ -281,20 +278,15 @@
   }
   await sp(`${rates}/roleassignments/addroleassignment(principalid=${accounts.Id},roledefid=${edit})`, { method: 'POST' });
 
-  // Items: only the Employee reads their own row. Adding a role that already exists is a no-op, so reruns are safe.
-  // ponytail: changing an item's Employee leaves the old person's Read in place; remove it by hand on that item.
-  let unassigned = 0;
-  for (const item of (await sp(`${rates}/items?$select=Id,Title,EmployeeId,HasUniqueRoleAssignments&$top=5000`)).results) {
-    const it = `${rates}/items(${item.Id})`;
-    if (!item.HasUniqueRoleAssignments) {
-      await sp(`${it}/breakroleinheritance(copyRoleAssignments=false,clearSubscopes=true)`, { method: 'POST' });
-      await sp(`${it}/roleassignments/addroleassignment(principalid=${owners.Id},roledefid=${fullControl})`, { method: 'POST' });
-      await sp(`${it}/roleassignments/addroleassignment(principalid=${accounts.Id},roledefid=${edit})`, { method: 'POST' });
-    }
-    if (item.EmployeeId) await sp(`${it}/roleassignments/addroleassignment(principalid=${item.EmployeeId},roledefid=${read})`, { method: 'POST' });
-    else unassigned++;
+  // Items inherit the list: the timesheet's Employee dropdown loads anyone's rates, so every Member reads every row
+  // (client, 2026-11-04). Earlier runs gave each row its own permissions; this undoes that.
+  let reset = 0;
+  for (const item of (await sp(`${rates}/items?$select=Id,HasUniqueRoleAssignments&$top=5000`)).results) {
+    if (!item.HasUniqueRoleAssignments) continue;
+    await sp(`${rates}/items(${item.Id})/resetroleinheritance`, { method: 'POST' });
+    reset++;
   }
-  console.log(`Pay Rates permissions set. ${unassigned} row(s) have no Employee yet.`);
+  console.log(`Pay Rates permissions set. ${reset} row(s) reset to the list permissions.`);
 
   const folder = (await sp(`${lib}/RootFolder?$select=ServerRelativeUrl`)).ServerRelativeUrl;
   console.log(`Done. Upload Templates/xlsx/*.xlsx to ${location.origin}${folder}`);

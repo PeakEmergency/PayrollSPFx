@@ -69,6 +69,20 @@ $border: #b2b2b2;
   font-size: clamp(18px, 2.2vw, 27px);
   font-weight: 700;
   min-height: 1.2em;
+  flex: 0 1 360px;
+  min-width: 0;
+
+  :global(.ms-Dropdown-title) {
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: 36px;
+    height: 40px;
+  }
+
+  :global(.ms-Dropdown-caretDownWrapper) {
+    height: 40px;
+    line-height: 40px;
+  }
 }
 
 .period {
