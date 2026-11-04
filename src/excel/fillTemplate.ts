@@ -100,6 +100,10 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
   const totals = computeTotals(data.type, data.lines);
   def.totals.forEach(({ key, cell }) => setResult(cell, totals[key]));
 
+  // ExcelJS drops external link parts but keeps names that use them ('[1]Instructors'!…), and Excel then refuses the file.
+  const names = wb.definedNames as unknown as { model: { ranges: string[] }[] };
+  names.model = names.model.filter((n) => !n.ranges.some((r) => r.indexOf('[') >= 0));
+
   wb.calcProperties.fullCalcOnLoad = true;
   return (await wb.xlsx.writeBuffer()) as ArrayBuffer;
 }

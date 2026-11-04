@@ -129,3 +129,11 @@ it('blank grid rows use the guarded lookup and cache 0, not an error', async () 
   expect((m.getCell('H9').value as { result?: number }).result || 0).toBe(0);
   expect((m as unknown as { dataValidations: { model: Record<string, unknown> } }).dataValidations.model.G8).toBeUndefined();
 });
+
+it('drops names that point at external workbooks, which Excel rejects once ExcelJS drops the link', async () => {
+  const data: TimesheetData = { type: 'Admin', name: 'NIKODYM, CAROLYN', from: '2026-10-01', to: '2026-10-15', lines: [] };
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(Buffer.from(await fillTemplate(toArrayBuffer(fixture('Admin')), data)) as unknown as ArrayBuffer);
+  const ranges = (wb.definedNames as unknown as { model: { name: string; ranges: string[] }[] }).model;
+  expect(ranges.map((n) => n.name)).toEqual(['RequiredFields']);
+});
