@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { DefaultButton, MessageBar, MessageBarType, PrimaryButton } from '@fluentui/react';
+import { DefaultButton, Dropdown, MessageBar, MessageBarType, PrimaryButton } from '@fluentui/react';
 import styles from './TimesheetForm.module.scss';
 import TimesheetGrid from './TimesheetGrid';
 import logo from '../assets/peak-logo.jpg';
@@ -10,14 +10,15 @@ import { validate } from '../../../timesheet/validate';
 import { SubmitResult } from '../../../services/submit';
 import { PayPeriod } from '../../../timesheet/payPeriods';
 import PayPeriodPicker from './PayPeriodPicker';
-import { hasRate, PayRates } from '../../../timesheet/rates';
+import { hasRate, PayRates, rateKey, refillRates } from '../../../timesheet/rates';
+import { Employee } from '../../../services/sharepoint';
 
 export interface ITimesheetFormProps {
   emailTo: string;
-  getName(): Promise<string>;
+  getEmployees(): Promise<Employee[]>;
   getPayPeriods(): Promise<PayPeriod[]>;
-  /** The signed-in person's Pay Rates row; undefined when they have none. */
-  getPayRates(): Promise<PayRates | undefined>;
+  /** Every Pay Rates row, keyed by rateKey(name). */
+  getPayRates(): Promise<Record<string, PayRates>>;
   submit(data: TimesheetData): Promise<SubmitResult>;
   /** Shown in place of the timesheet when the Expense Report button is picked. */
   expenseReport: React.ReactNode;
@@ -31,7 +32,7 @@ const plainTotals: string[] = ['days', 'adminHours', 'deductions', 'hours'];
 const hasEntries = (lines: Line[]): boolean =>
   lines.some((l) => Object.keys(l).some((k) => l[k] !== null && l[k] !== undefined && l[k] !== ''));
 
-export default function TimesheetForm({ emailTo, getName, getPayPeriods, getPayRates, submit, expenseReport }: ITimesheetFormProps): React.ReactElement {
+export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, getPayRates, submit, expenseReport }: ITimesheetFormProps): React.ReactElement {
   const [type, setType] = React.useState<TimesheetType | undefined>();
   // Both forms stay mounted once opened (just hidden), so switching never loses entries.
   const [showExpense, setShowExpense] = React.useState(false);
@@ -42,8 +43,8 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, getPayR
   const [to, setTo] = React.useState('');
   const [periods, setPeriods] = React.useState<PayPeriod[] | undefined>();
   const [periodsError, setPeriodsError] = React.useState('');
-  const [rates, setRates] = React.useState<PayRates | undefined>();
-  const [ratesLoaded, setRatesLoaded] = React.useState(false);
+  const [employees, setEmployees] = React.useState<Employee[]>([]);
+  const [allRates, setAllRates] = React.useState<Record<string, PayRates> | undefined>();
   const [ratesError, setRatesError] = React.useState('');
   const [lines, setLines] = React.useState<Line[]>([]);
   const [gridKey, setGridKey] = React.useState(0);
@@ -52,7 +53,7 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, getPayR
   const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
-    getName().then(setName, (err: Error) => setErrors([`Couldn't load your name: ${err.message}`]));
+    getEmployees().then(setEmployees, (err: Error) => setErrors([`Employees couldn't be loaded: ${err.message}`]));
   }, []);
 
   React.useEffect(() => {
@@ -60,14 +61,20 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, getPayR
   }, []);
 
   React.useEffect(() => {
-    getPayRates().then(
-      (r) => {
-        setRates(r);
-        setRatesLoaded(true);
-      },
-      (err: Error) => setRatesError(`Your pay rates couldn't be loaded: ${err.message}`)
-    );
+    getPayRates().then(setAllRates, (err: Error) => setRatesError(`Pay rates couldn't be loaded: ${err.message}`));
   }, []);
+
+  const ratesOf = (n: string): PayRates | undefined => (allRates && n ? allRates[rateKey(n)] : undefined);
+  const rates = ratesOf(name);
+  const ratesLoaded = allRates !== undefined;
+
+  const pickName = (n: string): void => {
+    setName(n);
+    if (type && hasEntries(lines)) {
+      setLines(refillRates(type, lines, ratesOf(n)));
+      setGridKey((k) => k + 1);
+    }
+  };
 
   const switchTo = (t: TimesheetType): void => {
     setType(t);
@@ -116,7 +123,7 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, getPayR
 
   const def = type ? TEMPLATES[type] : undefined;
   const totals = def ? computeTotals(def.type, lines) : {};
-  const rateProblem = !def ? '' : ratesError || (ratesLoaded && !hasRate(def.type, rates) ? 'No pay rate is set up for you on this timesheet. Contact accounts.' : '');
+  const rateProblem = !def ? '' : ratesError || (ratesLoaded && name && !hasRate(def.type, rates) ? `No pay rate is set up for ${name} on this timesheet. Contact accounts.` : '');
 
   return (
     <>
@@ -154,7 +161,14 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, getPayR
               <img className={styles.logo} src={logo} alt="Peak Emergency" />
             </div>
             <div className={styles.headerRow}>
-              <div className={styles.name} aria-label="Name">{name}</div>
+              <Dropdown
+                className={styles.name}
+                ariaLabel="Name"
+                placeholder="PICK FROM DROPDOWN"
+                selectedKey={name || null}
+                options={employees.map((e) => ({ key: e.name, text: e.name }))}
+                onChange={(_, o) => o && pickName(String(o.key))}
+              />
               <div className={styles.period}>
                 <h2 className={styles.periodLabel}>PAY PERIOD</h2>
                 <PayPeriodPicker
@@ -187,7 +201,7 @@ export default function TimesheetForm({ emailTo, getName, getPayPeriods, getPayR
           </div>
 
           {rateProblem && <MessageBar messageBarType={MessageBarType.error}>{rateProblem}</MessageBar>}
-          <PrimaryButton text={submitting ? 'Sending…' : 'Submit'} disabled={submitting || !from || !to || !ratesLoaded || !!rateProblem} onClick={onSubmit} />
+          <PrimaryButton text={submitting ? 'Sending…' : 'Submit'} disabled={submitting || !name || !from || !to || !ratesLoaded || !!rateProblem} onClick={onSubmit} />
         </>
       )}
 

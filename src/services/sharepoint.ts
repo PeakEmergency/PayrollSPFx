@@ -1,12 +1,14 @@
 import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
 import { TEMPLATES } from '../timesheet/definitions';
 import { PayPeriod, toPayPeriod } from '../timesheet/payPeriods';
-import { PayRates, toPayRates } from '../timesheet/rates';
+import { PayRates, rateKey, toPayRates } from '../timesheet/rates';
+import { formatEmployeeName } from '../timesheet/naming';
 import { TimesheetType } from '../timesheet/types';
 import { SubmissionRecord, SubmissionStatus, SubmissionStore, TemplateSource } from './submit';
 
 export const PAY_PERIOD_LIST = 'Pay Period Schedule';
 export const PAY_RATE_LIST = 'Pay Rates';
+export const EMPLOYEE_LIST = 'Employees';
 
 const jsonHeaders = {
   Accept: 'application/json;odata=nometadata',
@@ -133,16 +135,45 @@ export class SpPayRateSource {
     this.itemsUrl = `${webUrl}/_api/web/lists/getbytitle('${odataString(listTitle)}')/items`;
   }
 
-  /** The signed-in person's row, or undefined if they have none (item permissions hide everyone else's). */
-  public async getMyRates(userId: number): Promise<PayRates | undefined> {
-    const select = 'AdminRate,MedicPSL,RateAP,RateASU,RateNUECAFull,RateNUECABridging,RateNUECI,RateNUECB';
+  /** Every row, keyed by rateKey of the name ('Rosie Trinh' → 'TRINH, ROSIE'). */
+  public async getAllRates(): Promise<Record<string, PayRates>> {
+    const select = 'Title,AdminRate,MedicPSL,RateAP,RateASU,RateNUECAFull,RateNUECABridging,RateNUECI,RateNUECB';
     const res = await check(
-      'Loading your pay rates',
-      this.client.get(`${this.itemsUrl}?$select=${select}&$filter=EmployeeId eq ${userId}&$top=1`, SPHttpClient.configurations.v1, {
+      'Loading pay rates',
+      this.client.get(`${this.itemsUrl}?$select=${select}&$top=5000`, SPHttpClient.configurations.v1, {
         headers: { Accept: 'application/json;odata=nometadata' }
       })
     );
-    const [row] = (await res.json()).value;
-    return row ? toPayRates(row) : undefined;
+    const all: Record<string, PayRates> = {};
+    (await res.json()).value.forEach((row: Record<string, unknown>) => {
+      all[rateKey(formatEmployeeName(null, null, String(row.Title || '')))] = toPayRates(row);
+    });
+    return all;
+  }
+}
+
+export interface Employee {
+  key: string;
+  name: string;
+}
+
+export class SpEmployeeSource {
+  private readonly itemsUrl: string;
+
+  public constructor(private readonly client: SPHttpClient, webUrl: string, listTitle: string) {
+    this.itemsUrl = `${webUrl}/_api/web/lists/getbytitle('${odataString(listTitle)}')/items`;
+  }
+
+  /** Active people in the Employees list, A to Z. Title is 'LAST, FIRST'. */
+  public async getEmployees(): Promise<Employee[]> {
+    const res = await check(
+      'Loading employees',
+      this.client.get(`${this.itemsUrl}?$select=Title,InstructorKey,Active&$orderby=Title&$top=5000`, SPHttpClient.configurations.v1, {
+        headers: { Accept: 'application/json;odata=nometadata' }
+      })
+    );
+    return (await res.json()).value
+      .filter((r: { Active?: boolean }) => r.Active !== false)
+      .map((r: { Title: string; InstructorKey: string }) => ({ key: r.InstructorKey, name: r.Title }));
   }
 }

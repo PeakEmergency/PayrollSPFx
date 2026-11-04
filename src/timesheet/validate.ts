@@ -11,7 +11,7 @@ export function validate(data: TimesheetData): string[] {
   const def = TEMPLATES[data.type];
   const inputs = def.columns.filter((c) => c.kind !== 'computed');
 
-  if (!data.name.trim()) errors.push('Your name is missing.');
+  if (!data.name.trim()) errors.push('Pick your name.');
   if (!data.from) errors.push('Pick the pay period From date.');
   if (!data.to) errors.push('Pick the pay period To date.');
   if (data.from && data.to && data.to < data.from) errors.push("The To date can't be before the From date.");

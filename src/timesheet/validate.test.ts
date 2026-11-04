@@ -6,7 +6,7 @@ const base: TimesheetData = { type: 'Medic', name: 'NIKODYM, CAROLYN', from: '20
 it('empty sheet reports header fields and no rows', () => {
   expect(validate({ ...base, name: '', from: null, to: null })).toEqual(
     expect.arrayContaining([
-      'Your name is missing.',
+      'Pick your name.',
       'Pick the pay period From date.',
       'Pick the pay period To date.',
       'Enter at least one row.'

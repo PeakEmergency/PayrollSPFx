@@ -78,3 +78,12 @@ export function fillRate(type: TimesheetType, line: Line, rates: PayRates, edite
   const rate = rateFor(type, line, rates);
   return rate === undefined ? line : { ...line, [key]: rate };
 }
+
+/** Matches an Employees name ('LAST, FIRST (NICK)') to a Pay Rates name ('First Last'): nicknames and case ignored. */
+export const rateKey = (name: string): string => name.replace(/\s*\(.*?\)/g, '').trim().toUpperCase();
+
+/** A different employee was picked: every entered row takes that person's rate (blank if they have none). */
+export function refillRates(type: TimesheetType, lines: Line[], rates: PayRates | undefined): Line[] {
+  const key = RATE_KEY[type];
+  return lines.map((l) => fillRate(type, { ...l, [key]: null }, rates || { course: {} }, ''));
+}

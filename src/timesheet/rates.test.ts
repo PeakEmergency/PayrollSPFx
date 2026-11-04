@@ -1,4 +1,6 @@
-import { courseType, fillRate, hasRate, PayRates, toPayRates } from './rates';
+import { courseType, fillRate, hasRate, PayRates, rateKey, refillRates, toPayRates } from './rates';
+import { formatEmployeeName } from './naming';
+import { Line } from './types';
 
 const ben: PayRates = { course: { AP: 225, ASU: 225, NUECAFull: 150, NUECABridging: 150, NUECI: 225, NUECB: 225 }, medicPSL: 8 };
 const emma: PayRates = { course: {}, admin: 30 };
@@ -53,4 +55,17 @@ describe('fillRate', () => {
     expect(fillRate('Instructor', { course: 'AP-I-0182', dayRate: 150 }, ben, 'days').dayRate).toBe(150);
   });
   it('leaves the rate blank for an unknown course', () => expect(fillRate('Instructor', { course: 'XYZ' }, ben, 'course').dayRate).toBeUndefined());
+});
+
+describe('picking another employee', () => {
+  it('matches an Employees name to a Pay Rates name, ignoring nicknames', () => {
+    expect(rateKey('GEISE, WILLIAM (MAX)')).toBe(rateKey(formatEmployeeName(null, null, 'William Geise')));
+    expect(rateKey('TRINH, ROSIE')).toBe(rateKey(formatEmployeeName(null, null, 'Rosie Trinh')));
+  });
+
+  it('refills entered rows with the new rate and clears it when the person has none', () => {
+    const lines: Line[] = [{ date: '2026-11-02', hours: 8, rate: 24 }, {}];
+    expect(refillRates('Admin', lines, emma)).toEqual([{ date: '2026-11-02', hours: 8, rate: 30 }, { rate: null }]);
+    expect(refillRates('Admin', lines, undefined)[0].rate).toBeNull();
+  });
 });
