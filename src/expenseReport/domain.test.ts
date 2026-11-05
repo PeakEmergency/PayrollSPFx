@@ -3,6 +3,7 @@ import { createReport } from './domain/report';
 import { validateReport } from './domain/report';
 import { calendarStartDate, formatDateInput, fromCalendarDate, parseDateInput, toCalendarDate } from './domain/dates';
 import type { ExpenseReport } from './domain/models';
+import { expenseBody, expenseFileName, expenseSubject, hasEntries } from './domain/submission';
 
 describe('blank expense report', () => {
   it('creates thirteen independently editable slots and snapshots the configured rate', () => {
@@ -273,5 +274,38 @@ describe('workbook calculations', () => {
     expect(formatCurrency('+2.00')).toBe('$2.00');
     expect(formatQuantity('+1.25')).toBe('1.25');
     expect(formatCurrency('bad')).toBe('—');
+  });
+});
+
+describe('submission text', () => {
+  const r = (() => {
+    const report = createReport();
+    report.instructorId = 'instructor-1';
+    report.instructorName = 'TRINH, ROSIE';
+    report.fromDate = '05/11/26';
+    report.toDate = '18/11/26';
+    report.lines[0].kilometres = '718';
+    report.lines[0].rate = '0.48';
+    return report;
+  })();
+
+  it('names the file with ISO dates and the item ID', () => {
+    expect(expenseFileName(r, 7)).toBe('Expense Report - TRINH, ROSIE - 2026-11-05_2026-11-18 - 7.xlsx');
+    expect(expenseFileName(r, 8)).not.toBe(expenseFileName(r, 7));
+  });
+  it('builds the subject', () => {
+    expect(expenseSubject(r)).toBe('Expense Report from TRINH, ROSIE – 05/11/26 to 18/11/26');
+  });
+  it('builds an escaped HTML body with total and receipt count', () => {
+    const body = expenseBody({ ...r, instructorName: 'O<B>' }, 'a@peak.com', 2);
+    expect(body).toContain('O&lt;B&gt;');
+    expect(body).toContain('a@peak.com');
+    expect(body).toContain('Pay period: 05/11/26 to 18/11/26');
+    expect(body).toContain('Total: $344.64');
+    expect(body).toContain('Receipts: 2');
+  });
+  it('detects entered lines, ignoring the prefilled rate', () => {
+    expect(hasEntries(createReport())).toBe(false);
+    expect(hasEntries(r)).toBe(true);
   });
 });
