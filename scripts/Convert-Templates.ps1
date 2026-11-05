@@ -1,8 +1,8 @@
-# Converts the macro-enabled timesheet templates to macro-free .xlsx copies.
+# Converts the macro-enabled templates to macro-free .xlsx copies.
 # Edits the OOXML package directly (no Excel): drops vbaProject.bin and its relationship,
 # and switches the workbook content type from macroEnabled to the plain sheet type.
 # Excel COM was dropped because it hangs opening the Medic template.
-param([string[]]$Types = @('Admin', 'Instructor', 'Medic'))
+param([string[]]$Names = @('Admin Timesheet Template', 'Instructor Timesheet Template', 'Medic Timesheet Template', 'Expense Report Template'))
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
 $root = Split-Path -Parent $PSScriptRoot
@@ -21,9 +21,9 @@ function Edit-Entry($zip, $name, [scriptblock]$change) {
     $writer.Close()
 }
 
-foreach ($type in $Types) {
-    $in = Join-Path $src "$type Timesheet Template (current).xlsm"
-    $dest = Join-Path $out "$type Timesheet Template.xlsx"
+foreach ($name in $Names) {
+    $in = Join-Path $src "$name (current).xlsm"
+    $dest = Join-Path $out "$name.xlsx"
     Copy-Item -LiteralPath $in -Destination $dest -Force
     $zip = [IO.Compression.ZipFile]::Open($dest, 'Update')
     try {

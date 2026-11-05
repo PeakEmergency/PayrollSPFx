@@ -8,7 +8,7 @@ import { normalizeDate, parseTime, timeToDayFraction, toExcelDate } from '../tim
  * The prebuilt browser bundle, loaded on demand: keeps ExcelJS out of the main
  * bundle and avoids webpack Node polyfill errors. It also runs under Jest.
  */
-async function loadExcelJs(): Promise<typeof ExcelJSType> {
+export async function loadExcelJs(): Promise<typeof ExcelJSType> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: any = await import(/* webpackChunkName: 'exceljs' */ 'exceljs/dist/exceljs.min.js');
   return mod.default || mod;
