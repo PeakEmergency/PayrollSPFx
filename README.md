@@ -66,6 +66,27 @@ The name dropdown on every timesheet and the expense report lists the `Employees
 
 The flow updates the item, which fires the trigger again, but the trigger condition skips anything not `Queued`.
 
+### Expense report email flow
+
+A second flow, "Expense report email" (made with *Save As* from "Timesheet email" and created turned off), built the same way on the `ExpenseReports` list. Rerun `provisioning/provision-expense-reports.js` first: it adds the same `Status`, `Status Detail`, `Email To`, `Email Subject` and `Email Body` columns. `Status` has no default, so saved reports stay blank until something sets them to `Queued`.
+
+Not wired up yet: the web part does not set `Queued` or fill the email columns on expense reports. When it should (every save or a separate "send" step) is waiting on the client. To test the flow, fill the three email columns on a report by hand and set `Status` to `Queued`.
+
+The list has item-level security, so the flow's SharePoint connection must be an account in `Payroll Owners` (or a site owner); a Member account only sees its own reports.
+
+Differences from the timesheet flow, step by step:
+
+1. **Trigger:** as step 1 above, list `ExpenseReports`, same trigger condition.
+2. **Attachments variable:** *Initialize variable*, Name `Attachments`, Type Array, Value `[]`.
+3. **Get attachments:** as step 2 above, list `ExpenseReports`. A report can have several receipts (and later the filled Excel form), so all of them are sent.
+4. **Apply to each** over `body('Get_attachments')`, containing:
+   - *Get attachment content*: Id = `ID` from the trigger, File Identifier = `items('Apply_to_each')?['Id']`
+   - *Append to array variable* `Attachments`, Value (one expression; the classic designer rejects typed JSON mixed with tokens): `addProperty(addProperty(json('{}'), 'Name', items('Apply_to_each')?['DisplayName']), 'ContentBytes', body('Get_attachment_content')?['$content'])`
+5. **Send:** as step 4 above, but switch the Attachments field to array input (the **T** icon in the classic designer) and set it to `variables('Attachments')`. Check with **Peek code** that `Attachments` is `@variables('Attachments')`.
+6. **Mark sent / Mark failed:** as steps 5 and 6 above, Uri `_api/web/lists/getbytitle('ExpenseReports')/items(@{triggerBody()?['ID']})`. Configure *Mark failed* to run after *Send* has failed, timed out or is skipped.
+
+A report with no receipts sends with no attachments.
+
 ## Updating a template
 
 The web part writes values into fixed cells (see section 6 of the spec and `src/timesheet/definitions.ts`), so a template change must keep the sheet name, the cell positions and the file name.

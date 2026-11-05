@@ -159,7 +159,19 @@
     { name: 'SchemaVersion', type: 'Number', required: true,
       xml: "<Field Type='Number' Name='SchemaVersion' StaticName='SchemaVersion' DisplayName='SchemaVersion' Decimals='0' Required='TRUE' />" },
     { name: 'Payload', type: 'Note', required: true,
-      xml: "<Field Type='Note' Name='Payload' StaticName='Payload' DisplayName='Payload' RichText='FALSE' AppendOnly='FALSE' NumLines='6' Required='TRUE' />" }
+      xml: "<Field Type='Note' Name='Payload' StaticName='Payload' DisplayName='Payload' RichText='FALSE' AppendOnly='FALSE' NumLines='6' Required='TRUE' />" },
+    // Read and set by the "Expense report email" flow, same as on Timesheet Submissions.
+    // No default: a report has no Status until it is queued for email.
+    { name: 'Status', type: 'Choice',
+      xml: "<Field Type='Choice' Name='Status' StaticName='Status' DisplayName='Status'><CHOICES><CHOICE>Pending</CHOICE><CHOICE>Queued</CHOICE><CHOICE>Sent</CHOICE><CHOICE>Email failed</CHOICE></CHOICES></Field>" },
+    { name: 'StatusDetail', type: 'Note',
+      xml: "<Field Type='Note' Name='StatusDetail' StaticName='StatusDetail' DisplayName='Status Detail' RichText='FALSE' NumLines='3' />" },
+    { name: 'EmailTo', type: 'Text',
+      xml: "<Field Type='Text' Name='EmailTo' StaticName='EmailTo' DisplayName='Email To' />" },
+    { name: 'EmailSubject', type: 'Text',
+      xml: "<Field Type='Text' Name='EmailSubject' StaticName='EmailSubject' DisplayName='Email Subject' MaxLength='255' />" },
+    { name: 'EmailBody', type: 'Note',
+      xml: "<Field Type='Note' Name='EmailBody' StaticName='EmailBody' DisplayName='Email Body' RichText='FALSE' NumLines='6' />" }
   ];
   for (const spec of reportSpecs) await ensureField(reports, await getFields(reports), spec);
   const reportFields = await getFields(reports);
