@@ -219,8 +219,8 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
         {sent && <MessageBar messageBarType={MessageBarType.success}>{sent}</MessageBar>}
       </div>
       </div>
+      {expenseOpened && <div hidden={!showExpense}>{expenseReport}</div>}
     </div>
-    {expenseOpened && <div hidden={!showExpense}>{expenseReport}</div>}
     </>
   );
 }
