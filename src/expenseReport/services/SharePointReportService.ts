@@ -228,7 +228,7 @@ export class SharePointReportService implements IReportService {
   }
   public async deleteAttachment(reportId: number, fileName: string): Promise<void> {
     try {
-      await this.request(`${this.itemUrl(reportId)}/AttachmentFiles/getByFileName('${literal(fileName)}')`, { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE', 'If-Match': '*' } });
+      await this.request(`${this.itemUrl(reportId)}/AttachmentFiles/getByFileName('${literal(fileName)}')`, { method: 'POST', headers: { 'Content-Type': 'application/json;odata=nometadata', 'X-HTTP-Method': 'DELETE', 'If-Match': '*' } });
     } catch (error) {
       if (!(error instanceof ReportServiceError) || error.status !== 404) throw error;
     }

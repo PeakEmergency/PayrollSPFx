@@ -34,6 +34,12 @@ class SharePointFixture implements HttpTransport {
     if (this.denied) return json({ error: { message: { value: 'Access denied' } } }, 403);
     const decoded = decodeURIComponent(url);
     const method = init.method || 'GET';
+    // Mirror SPHttpClient.configurations.v1 (jsonRequest): a POST without Content-Type gets a
+    // default one, which then requires OData-Version 3.0 or 4.0 (the service sends '').
+    const sent = new Headers(init.headers);
+    if (method !== 'GET' && !sent.has('Content-Type') && !['3.0', '4.0'].includes(sent.get('odata-version') || 'missing')) {
+      throw new Error('ISPHttpClientConfiguration.jsonRequest is enabled, which requires the "OData-Version" header to be 3.0 or 4.0');
+    }
     const itemId = /items\((\d+)\)/i.exec(decoded)?.[1];
     const item = itemId ? this.items.find(i => i.Id === Number(itemId)) : undefined;
     if (decoded.includes('AttachmentFiles')) {
