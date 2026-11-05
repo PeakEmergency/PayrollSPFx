@@ -56,13 +56,15 @@
 .expenseTable td { border-bottom: 1px solid #b2b2b2; border-right: 1px solid #b2b2b2; height: 36px; padding: 0; vertical-align: top; }
 .expenseTable tbody tr:first-child td { border-top: 1px solid #b2b2b2; }
 .dateHeading, .amountHeading { vertical-align: bottom; background: #f1f1f1; }
+.dateHeading { vertical-align: middle; }
 .mileageGroup, .mileageHeading, .mileageStart { background: #dfe6f5; }
 .otherGroup, .otherHeading, .otherStart { background: #e6f1df; }
 .plainHeading { font-weight: normal; }
 .expenseTable .mileageGroup, .expenseTable .otherGroup { font-size: 16px; }
 .expenseTable .mileageGroup, .expenseTable .otherGroup, .expenseTable .mileageStart,
 .expenseTable .otherStart, .expenseTable .sectionStart, .expenseTable .amountCell, .expenseTable .amountHeading { border-left: 7px solid #fff; }
-.dateCell { background: #f1f1f1; border-left: 1px solid #b2b2b2; }
+.dateCell { border-left: 1px solid #b2b2b2; }
+.dateCell :global(.ms-TextField-field) { text-align: center; cursor: pointer; }
 .amountCell { background: #f1f1f1; }
 .expenseTable .calculated { text-align: right; padding: 9px 5px; white-space: nowrap; vertical-align: middle; }
 .cellInput, .numericInput { margin: 0; }

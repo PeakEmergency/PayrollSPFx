@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Calendar, Callout, DayOfWeek, DefaultButton, DirectionalHint, IconButton, TextField } from '@fluentui/react';
+import { Calendar, Callout, DayOfWeek, DefaultButton, DirectionalHint, ITextField, TextField } from '@fluentui/react';
 import { calendarStartDate, fromCalendarDate, parseDateInput } from '../domain/dates';
 import styles from './ExpenseReport.module.scss';
 
@@ -29,9 +29,9 @@ export default function DateField(props: IDateFieldProps): React.ReactElement {
   const [open, setOpen] = React.useState(false);
   const [rangeError, setRangeError] = React.useState('');
   const anchor = React.useRef<HTMLDivElement>(null);
-  const button = React.useRef<HTMLButtonElement>(null);
+  const field = React.useRef<ITextField>(null);
   const name = props.label || props.ariaLabel || 'date';
-  const close = (): void => { setOpen(false); button.current?.focus(); };
+  const close = (): void => { setOpen(false); field.current?.focus(); };
   const choose = (date: Date): void => {
     const raw = fromCalendarDate(date);
     const iso = parseDateInput(raw);
@@ -45,18 +45,14 @@ export default function DateField(props: IDateFieldProps): React.ReactElement {
     setRangeError(''); props.onChange(raw); close();
   };
   return <div className={styles.payDate} ref={anchor}>
-    <div className={styles.dateEntry}>
-      <TextField id={props.id} label={props.label ? `${props.label}:` : undefined} ariaLabel={props.ariaLabel} value={props.value} placeholder="DD/MM/YY"
-        className={!props.value ? styles.emptyDate : undefined} disabled={props.disabled} required={!!props.label}
-        errorMessage={props.errorMessage} autoComplete="off"
-        onChange={(_, value) => { setRangeError(''); props.onChange(value || ''); }}
-        onDoubleClick={() => !props.disabled && setOpen(true)}
-        onKeyDown={event => { if (event.altKey && event.key === 'ArrowDown' && !props.disabled) { event.preventDefault(); setOpen(true); } }} />
-      <IconButton elementRef={button} className={styles.calendarButton} iconProps={{ iconName: 'Calendar' }}
-        ariaLabel={`Open ${name} calendar`} title={`Open ${name} calendar`}
-        aria-expanded={open} aria-controls={open ? `${props.id}-calendar` : undefined} disabled={props.disabled}
-        onClick={() => { setRangeError(''); setOpen(!open); }} />
-    </div>
+    {/* Client: looks like the timesheet date cells, a plain cell that opens the calendar on click. Typing still works. */}
+    <TextField componentRef={field} id={props.id} label={props.label ? `${props.label}:` : undefined} ariaLabel={props.ariaLabel}
+      value={props.value} borderless className={styles.cellInput} disabled={props.disabled} required={!!props.label}
+      errorMessage={props.errorMessage} autoComplete="off" aria-haspopup="dialog" aria-expanded={open}
+      aria-controls={open ? `${props.id}-calendar` : undefined}
+      onChange={(_, value) => { setRangeError(''); props.onChange(value || ''); }}
+      onClick={() => { if (!props.disabled) { setRangeError(''); setOpen(true); } }}
+      onKeyDown={event => { if (event.altKey && event.key === 'ArrowDown' && !props.disabled) { event.preventDefault(); setOpen(true); } }} />
     <div className={styles.printDate}>{props.label && <strong>{props.label}: </strong>}{props.value || ' '}</div>
     {open && !props.disabled && <Callout target={anchor} role="dialog" ariaLabel={`${name} calendar`}
       id={`${props.id}-calendar`} className={styles.calendarPopup} directionalHint={DirectionalHint.bottomLeftEdge}
