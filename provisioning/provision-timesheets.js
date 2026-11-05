@@ -2,7 +2,7 @@
 // Run it in the browser console (F12) on a page of the target site, signed in as a site owner.
 // Safe to rerun: anything that already exists is left alone.
 // Afterwards, drag the three files from Templates/xlsx into the Timesheet Templates library.
-(async () => {
+await (async () => {
   const ACCOUNTS_GROUP = 'Payroll Owners'; // SharePoint group that sees every submission
   const LIST_TITLE = 'Timesheet Submissions';
   const LIBRARY_TITLE = 'Timesheet Templates';

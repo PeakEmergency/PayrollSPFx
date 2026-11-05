@@ -6,7 +6,7 @@
  * the 'Payroll Owners' group gets Edit (Edit bypasses item-level security).
  * It never deletes lists or items. Rerun after fixing any reported schema conflict.
  */
-(async () => {
+await (async () => {
   'use strict';
 
   const site = 'https://peakemergency.sharepoint.com';
