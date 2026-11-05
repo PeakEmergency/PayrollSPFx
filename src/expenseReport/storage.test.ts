@@ -46,7 +46,7 @@ class SharePointFixture implements HttpTransport {
       if (!item) return json({ error: { message: 'Missing item' } }, 404);
       const fileName = /(?:FileName=|getByFileName\(|AttachmentFiles\()'((?:[^']|'')*)'/i.exec(decoded)?.[1]?.replace(/''/g, "'");
       if (method === 'POST' && new Headers(init.headers).get('X-HTTP-Method') === 'DELETE') {
-        return this.files.delete(fileName!) ? new Response(null, { status: 200 }) : json({ error: { message: 'File not found' } }, 404);
+        return this.files.delete(fileName!) ? new Response(null, { status: 200 }) : json({ error: { message: 'Specified argument was out of the range of valid values. Parameter name: fileName' } }, 400);
       }
       if (method === 'POST') {
         if (this.failAttachment) return json({ error: { message: 'Upload unavailable' } }, 503);

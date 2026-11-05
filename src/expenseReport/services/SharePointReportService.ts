@@ -227,11 +227,10 @@ export class SharePointReportService implements IReportService {
     await this.merge(reportId, { Status: newStatus || null }, etag);
   }
   public async deleteAttachment(reportId: number, fileName: string): Promise<void> {
-    try {
-      await this.request(`${this.itemUrl(reportId)}/AttachmentFiles/getByFileName('${literal(fileName)}')`, { method: 'POST', headers: { 'Content-Type': 'application/json;odata=nometadata', 'X-HTTP-Method': 'DELETE', 'If-Match': '*' } });
-    } catch (error) {
-      if (!(error instanceof ReportServiceError) || error.status !== 404) throw error;
-    }
+    // SharePoint answers HTTP 400 (not 404) for a missing file, so look the name up first.
+    const found = (await this.receipts(reportId)).find(receipt => receipt.name.toLowerCase() === fileName.toLowerCase());
+    if (!found) return;
+    await this.request(`${this.itemUrl(reportId)}/AttachmentFiles/getByFileName('${literal(found.name)}')`, { method: 'POST', headers: { 'Content-Type': 'application/json;odata=nometadata', 'X-HTTP-Method': 'DELETE', 'If-Match': '*' } });
   }
   public async attachFile(reportId: number, fileName: string, content: ArrayBuffer): Promise<void> {
     await this.deleteAttachment(reportId, fileName);
