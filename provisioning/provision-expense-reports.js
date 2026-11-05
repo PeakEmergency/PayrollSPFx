@@ -144,10 +144,14 @@
 
   let reports = await ensureList('ExpenseReports', 'Peak expense reports; each item stores a versioned 13-row report payload.');
   // Item-level security (Read/WriteSecurity 2): users read and edit only their own reports.
+  // SharePoint refuses item-level security on a list with unique-value columns, so ClientId
+  // is indexed but not unique (ClientIds are random per report; the web part rejects duplicates).
+  const oldClientId = (await getFields(reports)).find(item => item.InternalName === 'ClientId');
+  if (oldClientId && oldClientId.EnforceUniqueValues === true) await mergeField(reports, oldClientId, { EnforceUniqueValues: false });
   reports = await ensureListSettings(reports, { EnableAttachments: true, EnableVersioning: true, ReadSecurity: 2, WriteSecurity: 2 });
   const reportSpecs = [
-    { name: 'ClientId', type: 'Text', required: true, indexed: true, unique: true,
-      xml: "<Field Type='Text' Name='ClientId' StaticName='ClientId' DisplayName='ClientId' MaxLength='255' Required='TRUE' Indexed='TRUE' EnforceUniqueValues='TRUE' />" },
+    { name: 'ClientId', type: 'Text', required: true, indexed: true,
+      xml: "<Field Type='Text' Name='ClientId' StaticName='ClientId' DisplayName='ClientId' MaxLength='255' Required='TRUE' Indexed='TRUE' />" },
     { name: 'InstructorKey', type: 'Text', required: true, indexed: true,
       xml: "<Field Type='Text' Name='InstructorKey' StaticName='InstructorKey' DisplayName='InstructorKey' MaxLength='255' Required='TRUE' Indexed='TRUE' />" },
     { name: 'InstructorName', type: 'Text', required: true,

@@ -162,7 +162,7 @@ export class SharePointReportService implements IReportService {
   }
   private async findClient(clientId: string, payload: string): Promise<ExpenseReport | undefined> {
     const rows = await this.collection(`${this.reportsUrl}/items?$filter=ClientId%20eq%20'${literal(clientId)}'&$top=2`);
-    if (rows.length > 1) invalid('Duplicate client report keys exist. Enforce the unique ClientId index before saving.');
+    if (rows.length > 1) invalid('Two reports share one ClientId. Delete the extra item in the ExpenseReports list before saving.');
     if (!rows.length) return undefined;
     // nometadata collection responses may omit item ETags. Read the item so the
     // authoritative HTTP version header is available before returning identity.
@@ -192,7 +192,7 @@ export class SharePointReportService implements IReportService {
       return await this.verifySavedReport(id(data.Id), payload);
     } catch (error) {
       if (!(error instanceof ReportServiceError) || !['network', 'conflict', 'server'].includes(error.kind)) throw error;
-      // A create may have committed despite a lost response. A unique indexed ClientId
+      // A create may have committed despite a lost response. The indexed ClientId
       // makes this lookup/retry safe across component and browser lifetimes.
       const recovered = await this.findClient(report.clientId, payload);
       if (recovered) return recovered;
