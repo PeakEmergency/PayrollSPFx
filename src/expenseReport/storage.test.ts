@@ -38,12 +38,15 @@ class SharePointFixture implements HttpTransport {
     const item = itemId ? this.items.find(i => i.Id === Number(itemId)) : undefined;
     if (decoded.includes('AttachmentFiles')) {
       if (!item) return json({ error: { message: 'Missing item' } }, 404);
-      const fileName = /(?:FileName=|AttachmentFiles\()'((?:[^']|'')*)'/i.exec(decoded)?.[1]?.replace(/''/g, "'");
+      const fileName = /(?:FileName=|getByFileName\(|AttachmentFiles\()'((?:[^']|'')*)'/i.exec(decoded)?.[1]?.replace(/''/g, "'");
+      if (method === 'POST' && new Headers(init.headers).get('X-HTTP-Method') === 'DELETE') {
+        return this.files.delete(fileName!) ? new Response(null, { status: 200 }) : json({ error: { message: 'File not found' } }, 404);
+      }
       if (method === 'POST') {
         if (this.failAttachment) return json({ error: { message: 'Upload unavailable' } }, 503);
         if (!fileName) throw new Error('Fixture expected a file name');
         if (this.files.has(fileName)) return json({ error: { message: 'Already exists' } }, 409);
-        this.files.set(fileName, new Uint8Array(await (init.body as Blob).arrayBuffer()));
+        this.files.set(fileName, new Uint8Array(init.body instanceof ArrayBuffer ? init.body : await (init.body as Blob).arrayBuffer()));
         if (this.interruptAttachment) { this.interruptAttachment = false; throw new TypeError('Connection lost after upload'); }
         return json({ FileName: fileName, ServerRelativeUrl: `/sites/expense/Lists/ExpenseReports/Attachments/${item.Id}/${fileName}` }, 200);
       }
@@ -54,7 +57,7 @@ class SharePointFixture implements HttpTransport {
       if (!item) return json({}, 404);
       if (method === 'POST') {
         const headers = new Headers(init.headers);
-        if (headers.get('If-Match') !== `"${item.version}"`) return json({ error: { message: 'Version conflict' } }, 412);
+        if (headers.get('If-Match') !== '*' && headers.get('If-Match') !== `"${item.version}"`) return json({ error: { message: 'Version conflict' } }, 412);
         Object.assign(item, JSON.parse(init.body as string)); item.version++;
         this.afterReportWrite?.(item);
         return new Response(null, { status: 204 });
@@ -277,5 +280,69 @@ describe('independent memory preview', () => {
     expect(updated.etag).not.toEqual(saved.etag);
     const receipt = await memory.uploadReceipt(saved.id!, new File(['a'], 'a.txt'));
     expect((await memory.loadReport(saved.id!)).receipts).toEqual([receipt]);
+  });
+});
+
+describe('submission operations', () => {
+  it('reads status, blank as draft', async () => {
+    const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
+    await service.saveReport(report());
+    expect((await service.loadReport(1)).report.status).toBe('');
+    expect((await service.listReports(OWNER))[0].status).toBe('');
+    fixture.items[0].Status = 'Queued';
+    expect((await service.loadReport(1)).report.status).toBe('Queued');
+    expect((await service.listReports(OWNER))[0].status).toBe('Queued');
+    fixture.items[0].Status = 'Bogus';
+    await expect(service.loadReport(1)).rejects.toMatchObject({ kind: 'invalidData' });
+  });
+  it('sets status with the given ETag, and * without one', async () => {
+    const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
+    const saved = await service.saveReport(report());
+    await service.setStatus(1, 'Pending', saved.etag);
+    expect(fixture.items[0].Status).toBe('Pending');
+    await expect(service.setStatus(1, 'Pending', '"99"')).rejects.toMatchObject({ kind: 'conflict', status: 412 });
+    await service.setStatus(1, '');
+    expect(fixture.items[0].Status).toBeNull();
+  });
+  it('refuses to save a submitted report', async () => {
+    const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
+    const saved = await service.saveReport(report());
+    const payload = fixture.items[0].Payload;
+    fixture.items[0].Status = 'Queued';
+    await expect(service.saveReport({ ...saved, instructorName: 'Changed' })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(service.saveReport(report())).rejects.toMatchObject({ kind: 'conflict' });
+    expect(fixture.items[0].Payload).toBe(payload);
+    expect(JSON.parse(payload).status).toBeUndefined();
+  });
+  it('attaches, replaces and deletes a file whose name has an apostrophe', async () => {
+    const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
+    await service.saveReport(report());
+    const name = "Expense Report - O'CONNOR, KATHRYN (KATIE) - 2026-11-05_2026-11-18 - 1.xlsx";
+    await service.attachFile(1, name, new Uint8Array([1]).buffer);
+    await service.attachFile(1, name, new Uint8Array([2]).buffer);
+    expect(Array.from(fixture.files.get(name)!)).toEqual([2]);
+    await service.deleteAttachment(1, name);
+    expect(fixture.files.has(name)).toBe(false);
+    await expect(service.deleteAttachment(1, name)).resolves.toBeUndefined();
+  });
+  it('queues the email', async () => {
+    const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);
+    await service.saveReport(report());
+    await service.queueEmail(1, { to: 'acc@peak.com', subject: 'S', body: 'B' });
+    expect(fixture.items[0]).toMatchObject({ EmailTo: 'acc@peak.com', EmailSubject: 'S', EmailBody: 'B', StatusDetail: '', Status: 'Queued' });
+  });
+  it('memory service behaves the same', async () => {
+    const memory = new MemoryReportService();
+    const saved = await memory.saveReport(report());
+    expect(saved.status).toBe('');
+    await expect(memory.setStatus(1, 'Pending', '"99"')).rejects.toMatchObject({ kind: 'conflict' });
+    await memory.attachFile(1, 'a.xlsx', new Uint8Array([1]).buffer);
+    await memory.attachFile(1, 'a.xlsx', new Uint8Array([2]).buffer);
+    expect((await memory.loadReport(1)).receipts).toHaveLength(1);
+    await memory.deleteAttachment(1, 'a.xlsx'); await memory.deleteAttachment(1, 'a.xlsx');
+    expect((await memory.loadReport(1)).receipts).toHaveLength(0);
+    await memory.queueEmail(1, { to: 'a', subject: 'b', body: 'c' });
+    expect((await memory.listReports())[0].status).toBe('Queued');
+    await expect(memory.saveReport(saved)).rejects.toMatchObject({ kind: 'conflict' });
   });
 });

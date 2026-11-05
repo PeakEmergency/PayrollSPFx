@@ -12,11 +12,13 @@ export interface ExpenseLine {
   cost: string;
 }
 
+export type ReportStatus = '' | 'Pending' | 'Queued' | 'Sent' | 'Email failed';
 export interface ExpenseReport {
   schemaVersion: 1;
   clientId: string;
   id?: number;
   etag?: string;
+  status?: ReportStatus;
   instructorId: string;
   instructorName: string;
   fromDate: string;
@@ -32,6 +34,7 @@ export interface ReportSummary {
   fromDate: string;
   toDate: string;
   modified: string;
+  status: ReportStatus;
 }
 export interface ValidationIssue { field: string; message: string; }
 export interface ReportTotals {

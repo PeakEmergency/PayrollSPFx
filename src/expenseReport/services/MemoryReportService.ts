@@ -1,8 +1,9 @@
-import type { ExpenseReport, ReceiptInfo, ReportSummary } from '../domain/models';
+import type { ExpenseReport, ReceiptInfo, ReportStatus, ReportSummary } from '../domain/models';
 import { ReportServiceError, type IReportService } from './IReportService';
 import { encodeReport, decodeReport } from './reportCodec';
 import { equalReceiptBytes, validateReceiptName } from './SharePointReportService';
-type SavedReport = { payload: string; version: number; modified: string; receipts: { info: ReceiptInfo; bytes: ArrayBuffer }[] };
+const SUBMITTED = 'This report has been submitted and can no longer be changed. Start a new report for more expenses.';
+type SavedReport = { payload: string; status: ReportStatus; email?: { to: string; subject: string; body: string }; version: number; modified: string; receipts: { info: ReceiptInfo; bytes: ArrayBuffer }[] };
 export class MemoryReportService implements IReportService {
   private readonly reports = new Map<number, SavedReport>();
   private nextId = 1;
@@ -11,12 +12,12 @@ export class MemoryReportService implements IReportService {
     if (!saved) throw new ReportServiceError('The preview report was not found.', 'notFound', 404);
     return saved;
   }
-  private model(id: number, saved: SavedReport): ExpenseReport { return { ...decodeReport(saved.payload), id, etag: `"${saved.version}"` }; }
+  private model(id: number, saved: SavedReport): ExpenseReport { return { ...decodeReport(saved.payload), id, etag: `"${saved.version}"`, status: saved.status }; }
   public async listReports(): Promise<ReportSummary[]> {
     return Array.from(this.reports, ([id, saved]) => {
       const report = this.model(id, saved);
       return { id, title: `${report.instructorName} ${report.fromDate} – ${report.toDate}`, instructorName: report.instructorName,
-        fromDate: report.fromDate, toDate: report.toDate, modified: saved.modified };
+        fromDate: report.fromDate, toDate: report.toDate, modified: saved.modified, status: saved.status };
     }).sort((a, b) => b.modified.localeCompare(a.modified) || b.id - a.id);
   }
   public async loadReport(id: number): Promise<{ report: ExpenseReport; receipts: ReceiptInfo[] }> {
@@ -27,6 +28,7 @@ export class MemoryReportService implements IReportService {
     const payload = encodeReport(report);
     if (report.id !== undefined) {
       const saved = this.saved(report.id);
+      if (saved.status) throw new ReportServiceError(SUBMITTED, 'conflict');
       if (report.etag !== `"${saved.version}"`) throw new ReportServiceError('This preview report has changed. Reopen it before saving.', 'conflict', 412);
       if (decodeReport(saved.payload).clientId !== report.clientId) throw new ReportServiceError('The report identity cannot change.', 'invalidData');
       saved.payload = payload; saved.version++; saved.modified = new Date().toISOString();
@@ -34,12 +36,13 @@ export class MemoryReportService implements IReportService {
     }
     for (const [id, saved] of this.reports) {
       if (decodeReport(saved.payload).clientId === report.clientId) {
+        if (saved.status) throw new ReportServiceError(SUBMITTED, 'conflict');
         if (saved.payload !== payload) throw new ReportServiceError('This client key already identifies a different saved report. Reopen it before saving.', 'conflict');
         return this.model(id, saved);
       }
     }
     const id = this.nextId++;
-    const saved = { payload, version: 1, modified: new Date().toISOString(), receipts: [] };
+    const saved = { payload, status: '' as ReportStatus, version: 1, modified: new Date().toISOString(), receipts: [] };
     this.reports.set(id, saved);
     return this.model(id, saved);
   }
@@ -57,5 +60,24 @@ export class MemoryReportService implements IReportService {
     const info = { name: file.name, url: `data:application/octet-stream;base64,${btoa(binary)}` };
     saved.receipts.push({ info, bytes });
     return { ...info };
+  }
+  public async setStatus(id: number, status: ReportStatus, etag?: string): Promise<void> {
+    const saved = this.saved(id);
+    if (etag !== undefined && etag !== `"${saved.version}"`) throw new ReportServiceError('This preview report has changed. Reopen it before saving.', 'conflict', 412);
+    saved.status = status; saved.version++;
+  }
+  public async deleteAttachment(id: number, fileName: string): Promise<void> {
+    const saved = this.saved(id);
+    saved.receipts = saved.receipts.filter(receipt => receipt.info.name !== fileName);
+  }
+  public async attachFile(id: number, fileName: string, content: ArrayBuffer): Promise<void> {
+    await this.deleteAttachment(id, fileName);
+    let binary = '';
+    for (const byte of new Uint8Array(content)) binary += String.fromCharCode(byte);
+    this.saved(id).receipts.push({ info: { name: fileName, url: `data:application/octet-stream;base64,${btoa(binary)}` }, bytes: content });
+  }
+  public async queueEmail(id: number, email: { to: string; subject: string; body: string }): Promise<void> {
+    const saved = this.saved(id);
+    saved.email = email; saved.status = 'Queued'; saved.version++;
   }
 }

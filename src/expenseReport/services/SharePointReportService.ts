@@ -1,4 +1,4 @@
-import type { ExpenseReport, ReceiptInfo, ReportSummary } from '../domain/models';
+import type { ExpenseReport, ReceiptInfo, ReportStatus, ReportSummary } from '../domain/models';
 import { formatDateInput, parseDateInput } from '../domain/dates';
 import { ReportServiceError, type IReportService } from './IReportService';
 import { decodeReport, encodeReport } from './reportCodec';
@@ -21,6 +21,13 @@ function string(value: unknown, name: string): string {
 function id(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) invalid('SharePoint returned an invalid report ID.');
   return value;
+}
+const STATUSES: string[] = ['Pending', 'Queued', 'Sent', 'Email failed'];
+const SUBMITTED = 'This report has been submitted and can no longer be changed. Start a new report for more expenses.';
+function status(value: unknown): ReportStatus {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value !== 'string' || !STATUSES.includes(value)) invalid('SharePoint returned an invalid Status field. Check the configured list schema.');
+  return value as ReportStatus;
 }
 function literal(value: string): string { return encodeURIComponent(value.replace(/'/g, "''")).replace(/'/g, '%27'); }
 function isoDate(value: unknown): string {
@@ -108,9 +115,9 @@ export class SharePointReportService implements IReportService {
     return rows;
   }
   public async listReports(ownerEmail: string): Promise<ReportSummary[]> {
-    const rows = await this.collection(`${this.reportsUrl}/items?$expand=Author&$filter=Author/EMail%20eq%20'${literal(ownerEmail)}'&$select=Id,Title,InstructorName,FromDate,ToDate,Modified,Author/EMail&$orderby=Modified desc&$top=5000`);
+    const rows = await this.collection(`${this.reportsUrl}/items?$expand=Author&$filter=Author/EMail%20eq%20'${literal(ownerEmail)}'&$select=Id,Title,InstructorName,FromDate,ToDate,Modified,Status,Author/EMail&$orderby=Modified desc&$top=5000`);
     return rows.map(row => ({ id: id(row.Id), title: string(row.Title, 'Title'), instructorName: string(row.InstructorName, 'InstructorName'),
-      fromDate: formatDateInput(isoDate(row.FromDate)), toDate: formatDateInput(isoDate(row.ToDate)), modified: string(row.Modified, 'Modified') }));
+      fromDate: formatDateInput(isoDate(row.FromDate)), toDate: formatDateInput(isoDate(row.ToDate)), modified: string(row.Modified, 'Modified'), status: status(row.Status) }));
   }
   private itemUrl(reportId: number): string { return `${this.reportsUrl}/items(${id(reportId)})`; }
   private decodeItem(data: JsonObject, headerEtag?: string | null): ExpenseReport {
@@ -121,11 +128,11 @@ export class SharePointReportService implements IReportService {
     if (data.SchemaVersion !== 1 || data.ClientId !== report.clientId || data.InstructorKey !== report.instructorId || data.InstructorName !== report.instructorName || isoDate(data.FromDate) !== parseDateInput(report.fromDate) || isoDate(data.ToDate) !== parseDateInput(report.toDate)) {
       invalid('The report headers do not match its saved payload. Reconcile the stored item before editing.');
     }
-    return { ...report, id: id(data.Id), etag };
+    return { ...report, id: id(data.Id), etag, status: status(data.Status) };
   }
   private async readReport(reportId: number): Promise<ExpenseReport> {
     // Without $select SharePoint omits ClientId from the item, which fails the header check.
-    const { data, response } = await this.json(`${this.itemUrl(reportId)}?$select=Id,ClientId,InstructorKey,InstructorName,FromDate,ToDate,SchemaVersion,Payload`);
+    const { data, response } = await this.json(`${this.itemUrl(reportId)}?$select=Id,ClientId,InstructorKey,InstructorName,FromDate,ToDate,SchemaVersion,Status,Payload`);
     return this.decodeItem(data, response.headers.get('ETag'));
   }
   private async verifySavedReport(reportId: number, payload: string): Promise<ExpenseReport> {
@@ -160,6 +167,7 @@ export class SharePointReportService implements IReportService {
     // nometadata collection responses may omit item ETags. Read the item so the
     // authoritative HTTP version header is available before returning identity.
     const existing = await this.readReport(id(rows[0].Id));
+    if (existing.status) throw new ReportServiceError(SUBMITTED, 'conflict');
     if (encodeReport(existing) !== payload) throw new ReportServiceError('A report with this client key is already saved with different content. Reopen it to continue safely.', 'conflict');
     return existing;
   }
@@ -172,6 +180,7 @@ export class SharePointReportService implements IReportService {
     if (report.id !== undefined) {
       if (!report.etag || report.etag === '*') throw new ReportServiceError('Reopen this report to obtain its current version before saving.', 'conflict');
       const current = await this.readReport(report.id);
+      if (current.status) throw new ReportServiceError(SUBMITTED, 'conflict');
       if (current.clientId !== report.clientId) throw new ReportServiceError('The stable report client identity cannot change.', 'invalidData');
       await this.request(this.itemUrl(report.id), { method: 'POST', headers: { 'Content-Type': 'application/json;odata=nometadata', 'X-HTTP-Method': 'MERGE', 'If-Match': report.etag }, body });
       return this.verifySavedReport(report.id, payload);
@@ -210,5 +219,25 @@ export class SharePointReportService implements IReportService {
       if (recovered) return recovered;
       throw error;
     }
+  }
+  private async merge(reportId: number, fields: JsonObject, etag = '*'): Promise<void> {
+    await this.request(this.itemUrl(reportId), { method: 'POST', headers: { 'Content-Type': 'application/json;odata=nometadata', 'X-HTTP-Method': 'MERGE', 'If-Match': etag }, body: JSON.stringify(fields) });
+  }
+  public async setStatus(reportId: number, newStatus: ReportStatus, etag?: string): Promise<void> {
+    await this.merge(reportId, { Status: newStatus || null }, etag);
+  }
+  public async deleteAttachment(reportId: number, fileName: string): Promise<void> {
+    try {
+      await this.request(`${this.itemUrl(reportId)}/AttachmentFiles/getByFileName('${literal(fileName)}')`, { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE', 'If-Match': '*' } });
+    } catch (error) {
+      if (!(error instanceof ReportServiceError) || error.status !== 404) throw error;
+    }
+  }
+  public async attachFile(reportId: number, fileName: string, content: ArrayBuffer): Promise<void> {
+    await this.deleteAttachment(reportId, fileName);
+    await this.request(`${this.itemUrl(reportId)}/AttachmentFiles/add(FileName='${literal(fileName)}')`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: content });
+  }
+  public async queueEmail(reportId: number, email: { to: string; subject: string; body: string }): Promise<void> {
+    await this.merge(reportId, { EmailTo: email.to, EmailSubject: email.subject, EmailBody: email.body, StatusDetail: '', Status: 'Queued' });
   }
 }
