@@ -58,7 +58,7 @@
   const listsUrl = `${api}/web/lists`;
   const listPath = id => `${listsUrl}(guid'${id}')`;
   async function ensureList(title, description) {
-    const all = asArray(await request(`${listsUrl}?$select=Title,BaseTemplate,Id,ListItemEntityTypeFullName,EnableAttachments,EnableVersioning&$top=5000`));
+    const all = asArray(await request(`${listsUrl}?$select=Title,BaseTemplate,Id,ListItemEntityTypeFullName,EnableAttachments,EnableVersioning,ReadSecurity,WriteSecurity&$top=5000`));
     const matches = all.filter(item => item.Title === title);
     if (matches.length > 1) throw new Error(`Multiple lists are titled ${title}; resolve them before provisioning.`);
     let list = matches[0];
@@ -72,7 +72,7 @@
         }
       });
     }
-    list = await request(`${listPath(list.Id)}?$select=Title,BaseTemplate,Id,ListItemEntityTypeFullName,EnableAttachments,EnableVersioning`);
+    list = await request(`${listPath(list.Id)}?$select=Title,BaseTemplate,Id,ListItemEntityTypeFullName,EnableAttachments,EnableVersioning,ReadSecurity,WriteSecurity`);
     return list;
   }
 
@@ -137,7 +137,7 @@
         method: 'POST', extraHeaders: { 'IF-MATCH': '*', 'X-HTTP-Method': 'MERGE' },
         body: { __metadata: { type: 'SP.List' }, ...updates }
       });
-      return request(`${listPath(list.Id)}?$select=Title,BaseTemplate,Id,ListItemEntityTypeFullName,EnableAttachments,EnableVersioning`);
+      return request(`${listPath(list.Id)}?$select=Title,BaseTemplate,Id,ListItemEntityTypeFullName,EnableAttachments,EnableVersioning,ReadSecurity,WriteSecurity`);
     }
     return list;
   }
