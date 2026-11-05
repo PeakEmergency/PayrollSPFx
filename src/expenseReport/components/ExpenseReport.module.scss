@@ -20,8 +20,8 @@
 .instructor { flex: 1 1 250px; min-width: 0; max-width: 540px; }
 .instructor :global(.ms-Dropdown-title) { font-size: clamp(18px, 2.2vw, 27px); font-weight: 700; line-height: 36px; height: 40px; }
 .instructor :global(.ms-Dropdown-caretDownWrapper) { height: 40px; line-height: 40px; }
-.payPeriod { min-width: 0; flex: 1 1 320px; }
-.payPeriod h2 { color: #f00; font-size: 22px; text-align: center; margin: 0 0 3px; }
+.payPeriod { min-width: 0; flex: 0 1 auto; }
+.payPeriod h2 { color: #f00; font-size: 22px; text-align: left; margin: 0 0 3px; }
 .payFields { display: flex; gap: 16px; justify-content: space-between; }
 .payDate { min-width: 0; flex: 1; }
 .dateEntry { display: flex; align-items: flex-start; min-width: 0; }
@@ -153,7 +153,7 @@
   .printInstructor span { font-size: 10pt; }
   .printInstructor strong { font-size: 16pt; }
   .payPeriod { min-width: 90mm; flex: 0 0 100mm; }
-  .payPeriod h2 { text-align: center; font-size: 16pt; }
+  .payPeriod h2 { text-align: left; font-size: 16pt; }
   .payFields { gap: 8mm; }
   .dateEntry { display: none; }
   .printDate { display: block; font-size: 11pt; white-space: nowrap; padding: 1mm 0; }
