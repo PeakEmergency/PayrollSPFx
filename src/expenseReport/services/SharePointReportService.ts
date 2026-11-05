@@ -124,7 +124,8 @@ export class SharePointReportService implements IReportService {
     return { ...report, id: id(data.Id), etag };
   }
   private async readReport(reportId: number): Promise<ExpenseReport> {
-    const { data, response } = await this.json(this.itemUrl(reportId));
+    // Without $select SharePoint omits ClientId from the item, which fails the header check.
+    const { data, response } = await this.json(`${this.itemUrl(reportId)}?$select=Id,ClientId,InstructorKey,InstructorName,FromDate,ToDate,SchemaVersion,Payload`);
     return this.decodeItem(data, response.headers.get('ETag'));
   }
   private async verifySavedReport(reportId: number, payload: string): Promise<ExpenseReport> {
