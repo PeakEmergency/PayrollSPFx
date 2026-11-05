@@ -8,6 +8,8 @@ import { createReport, validateReport } from '../domain/report';
 import ExpenseTable from './ExpenseTable';
 import PayPeriodPicker from '../../webparts/timesheet/components/PayPeriodPicker';
 import Receipts from './Receipts';
+import SendCopy from '../../webparts/timesheet/components/SendCopy';
+import { copyProblem, recipients } from '../../services/copyTo';
 import peakLogo from '../../webparts/timesheet/assets/peak-logo.jpg';
 import { PayPeriod } from '../../timesheet/payPeriods';
 import { Employee } from '../../services/sharepoint';
@@ -58,6 +60,8 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
   const confirmRef = React.useRef<HTMLElement>(null);
   const restoreFocusRef = React.useRef<HTMLElement | null>(null);
   const [periods, setPeriods] = React.useState<PayPeriod[] | undefined>();
+  const [copyTo, setCopyTo] = React.useState<string | undefined>();
+  const [copyError, setCopyError] = React.useState(false);
   const [periodsError, setPeriodsError] = React.useState('');
   const [reload, setReload] = React.useState(0);
   const summary = React.useRef<HTMLDivElement>(null);
@@ -170,18 +174,20 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
   // Loads the latest report (fresh etag, status and receipt count), submits it, then reloads. Holds busy throughout.
   const sendReport = async (id: number): Promise<void> => {
     if (busyRef.current) return;
+    // Checked here so Finish submitting is covered too.
+    if (copyProblem(copyTo)) { setCopyError(true); setStatus(''); setOperationError(copyProblem(copyTo)); return; }
     setOperationBusy('submitting'); setStatus(''); setOperationError('');
     try {
       const latest = await props.service.loadReport(id);
       try {
-        await submitReport(latest.report, { ...props.submission, service: props.service, receiptCount: latest.receipts.length });
+        await submitReport(latest.report, { ...props.submission, emailTo: recipients(props.submission.emailTo, copyTo), service: props.service, receiptCount: latest.receipts.length });
       } catch (error) {
         // submitReport changed the server etag and status; resync best effort, then show the original error.
         try { showLoaded(await props.service.loadReport(id)); await refreshList(); } catch { /* best effort */ }
         throw error;
       }
       showLoaded(await props.service.loadReport(id));
-      setStatus('Report submitted. Accounts will receive it by email.');
+      setStatus(`Report submitted. Accounts${copyTo ? ` and ${copyTo.trim()}` : ''} will receive it by email.`);
       await refreshList();
     } catch (error) { setOperationError(errorText(error)); }
     finally { setOperationBusy(); }
@@ -268,6 +274,9 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
       <Receipts instanceId={props.instanceId} receipts={receipts} pending={pendingFiles} disabled={readOnly}
         onAdd={files => { if (!busyRef.current) { setPendingFiles(current => [...current, ...files]); setStatus(''); } }}
         onRemove={index => { if (!busyRef.current) setPendingFiles(current => current.filter((_, i) => i !== index)); }} />
+      {(!report.status || report.status === 'Pending') && <div className={styles.noPrint}>
+        <SendCopy id={`${props.instanceId}-send-copy`} value={copyTo} showError={copyError} disabled={locked} onChange={setCopyTo} />
+      </div>}
       <div className={`${styles.actionArea} ${styles.noPrint}`}>
         <div className={styles.actions}>
           <PrimaryButton text="Save" disabled={readOnly || loading || !!loadError || !report.fromDate || !report.toDate} onClick={() => { save().catch(error => setOperationError(errorText(error))); }} />

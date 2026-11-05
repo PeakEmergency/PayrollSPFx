@@ -23,10 +23,12 @@ export default function PayPeriodPicker({ id, periods, error, from, to, disabled
   const message = error || (periods && !periods.length ? 'No pay periods are set up yet. Contact accounts.' : '');
 
   return (
-    <div>
+    // Client: no "Pay period" label (the PAY PERIOD heading says it), From and To on one line beside the dropdown.
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '6px 16px' }}>
       <Dropdown
         id={id}
-        label="Pay period"
+        ariaLabel="Pay period"
+        styles={{ root: { minWidth: 200 } }}
         dropdownWidth="auto"
         placeholder="Pick a pay period"
         options={options}
@@ -38,8 +40,9 @@ export default function PayPeriodPicker({ id, periods, error, from, to, disabled
         }}
         errorMessage={message || undefined}
       />
-      <div>From: <strong>{displayDate(from)}</strong></div>
-      <div>To: <strong>{displayDate(to)}</strong></div>
+      <div style={{ lineHeight: '32px', whiteSpace: 'nowrap' }}>
+        From: <strong>{displayDate(from)}</strong>&nbsp;&nbsp; To: <strong>{displayDate(to)}</strong>
+      </div>
     </div>
   );
 }

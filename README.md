@@ -6,6 +6,8 @@ SharePoint Framework web part for Peak Emergency timesheets. The user picks Admi
 2. fills a copy of the real template from the `Timesheet Templates` library and attaches it to the list item;
 3. sets the item to `Queued` (or to `Email failed` with the error text if step 2 fails).
 
+Both forms have a **Send a copy to me** Yes/No choice. Yes shows a **Send copy to** box; the address is added to `Email To` (separated by `;`), so the same email also goes to the submitter. It's only used on Submit, never on Save, and it isn't stored with a draft.
+
 A Power Automate flow then emails `Queued` items from the shared `schedule@peakemergencytraining.onmicrosoft.com` mailbox to accounts (default `accounting@peakemergency.com`) and sets `Sent` or `Email failed`. Submitters don't need a mailbox of their own; the body names the real sender and their email.
 
 Design: `docs/superpowers/specs/2026-10-30-timesheet-webpart-design.md`.

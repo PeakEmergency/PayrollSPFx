@@ -10,6 +10,7 @@ import { validate } from '../../../timesheet/validate';
 import { SubmitResult } from '../../../services/submit';
 import { PayPeriod } from '../../../timesheet/payPeriods';
 import PayPeriodPicker from './PayPeriodPicker';
+import SendCopy from './SendCopy';
 import { hasRate, PayRates, rateKey, refillRates } from '../../../timesheet/rates';
 import { Employee } from '../../../services/sharepoint';
 
@@ -51,6 +52,8 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
   const [errors, setErrors] = React.useState<string[]>([]);
   const [sent, setSent] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
+  const [copyTo, setCopyTo] = React.useState<string | undefined>();
+  const [triedSubmit, setTriedSubmit] = React.useState(false);
 
   React.useEffect(() => {
     getEmployees().then(setEmployees, (err: Error) => setErrors([`Employees couldn't be loaded: ${err.message}`]));
@@ -94,8 +97,9 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
 
   const onSubmit = async (): Promise<void> => {
     if (!type) return;
-    const data: TimesheetData = { type, name, from: from || null, to: to || null, lines };
+    const data: TimesheetData = { type, name, from: from || null, to: to || null, lines, copyTo };
     setSent('');
+    setTriedSubmit(true);
     const problems = validate(data);
     if (problems.length) {
       setErrors(problems);
@@ -106,7 +110,8 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
     try {
       const result = await submit(data);
       if (result.ok) {
-        setSent(`Timesheet submitted. It will be emailed to ${emailTo} within a few minutes.`);
+        setSent(`Timesheet submitted. It will be emailed to ${emailTo}${copyTo ? ` and ${copyTo.trim()}` : ''} within a few minutes.`);
+        setTriedSubmit(false);
         setLines([]);
         setFrom('');
         setTo('');
@@ -200,6 +205,7 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
             ))}
           </div>
 
+          <SendCopy id="send-copy" value={copyTo} showError={triedSubmit} disabled={submitting} onChange={setCopyTo} />
           {rateProblem && <MessageBar messageBarType={MessageBarType.error}>{rateProblem}</MessageBar>}
           <PrimaryButton text={submitting ? 'Sending…' : 'Submit'} disabled={submitting || !name || !from || !to || !ratesLoaded || !!rateProblem} onClick={onSubmit} />
         </>

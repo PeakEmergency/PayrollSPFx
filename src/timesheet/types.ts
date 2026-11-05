@@ -44,4 +44,6 @@ export interface TimesheetData {
   from: string | null;
   to: string | null;
   lines: Line[];
+  /** Also email the submission to this address. undefined: no copy. */
+  copyTo?: string;
 }

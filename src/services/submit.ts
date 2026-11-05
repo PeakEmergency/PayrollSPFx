@@ -4,6 +4,7 @@ import { TEMPLATES } from '../timesheet/definitions';
 import { buildFileName, buildSubject, ddmmyy } from '../timesheet/naming';
 import { TimesheetData, TimesheetType } from '../timesheet/types';
 import { validate } from '../timesheet/validate';
+import { recipients } from './copyTo';
 
 export type SubmissionStatus = 'Pending' | 'Queued' | 'Sent' | 'Email failed';
 
@@ -77,7 +78,7 @@ export async function submitTimesheet(data: TimesheetData, deps: SubmitDeps): Pr
     to: data.to!,
     totalAmount: total,
     lineItemsJson: JSON.stringify(data.lines.filter((l) => isEntered(data.type, l)).map((l) => computeLine(data.type, l))),
-    emailTo: deps.emailTo,
+    emailTo: recipients(deps.emailTo, data.copyTo),
     emailSubject: buildSubject(data),
     emailBody: buildBody(data, deps.senderEmail, total)
   });

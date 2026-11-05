@@ -2,6 +2,7 @@ import { TEMPLATES } from './definitions';
 import { TimesheetData } from './types';
 import { normalizeDate, parseTime } from './values';
 import { COURSE_EXAMPLES, courseType } from './rates';
+import { copyProblem } from '../services/copyTo';
 
 const has = (v: unknown): boolean => v !== null && v !== undefined && String(v).trim() !== '';
 
@@ -44,6 +45,8 @@ export function validate(data: TimesheetData): string[] {
     }
   });
   if (entered === 0) errors.push('Enter at least one row.');
+  const copy = copyProblem(data.copyTo);
+  if (copy) errors.push(copy);
 
   return errors;
 }

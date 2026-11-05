@@ -106,3 +106,16 @@ it('status update failure in the error path keeps the original error', async () 
   const result = await submitTimesheet(data, f.deps);
   expect(!result.ok && result.errors[0]).toContain('Template not found');
 });
+
+it('sends a copy to the address the submitter asked for', async () => {
+  const f = fakes();
+  expect(await submitTimesheet({ ...data, copyTo: 'carolyn@peakemergency.com' }, f.deps)).toEqual({ ok: true });
+  expect(f.created[0].emailTo).toBe('accounting@peakemergency.com;carolyn@peakemergency.com');
+});
+
+it('refuses a bad copy address before creating anything', async () => {
+  const f = fakes();
+  const result = await submitTimesheet({ ...data, copyTo: 'nope' }, f.deps);
+  expect(result.ok).toBe(false);
+  expect(f.calls).toEqual([]);
+});
