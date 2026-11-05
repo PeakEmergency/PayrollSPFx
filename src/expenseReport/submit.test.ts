@@ -54,7 +54,17 @@ describe('submitReport', () => {
     const del = jest.spyOn(service, 'deleteAttachment');
     await expect(submitReport(saved, deps)).rejects.toThrow('no template');
     expect((await service.loadReport(saved.id!)).report.status).toBe('');
-    expect(del).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalled();
+  });
+
+  it('returns to draft and cleans up when the upload response is lost', async () => {
+    const { service, deps } = setup();
+    const saved = await service.saveReport(draft());
+    jest.spyOn(service, 'attachFile').mockRejectedValue(new Error('response lost'));
+    const del = jest.spyOn(service, 'deleteAttachment');
+    await expect(submitReport(saved, deps)).rejects.toThrow(/^Submitting failed; the report is still a draft\. response lost/);
+    expect((await service.loadReport(saved.id!)).report.status).toBe('');
+    expect(del).toHaveBeenCalledWith(saved.id, expenseFileName(saved, saved.id!));
   });
 
   it('refuses a submitted report', async () => {
