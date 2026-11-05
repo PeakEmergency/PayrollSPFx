@@ -98,7 +98,8 @@ await (async () => {
         method: 'POST',
         body: { parameters: {
           __metadata: { type: 'SP.XmlSchemaFieldCreationInformation' },
-          SchemaXml: spec.xml, Options: 4
+          // 12 = AddToAllContentTypes + AddFieldInternalNameHint: keep Name as the internal name, not the display name.
+          SchemaXml: spec.xml, Options: 12
         } }
       });
       fields = await getFields(list);
