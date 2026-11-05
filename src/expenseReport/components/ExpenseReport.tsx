@@ -163,14 +163,24 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     } catch (error) { setOperationError(`Report could not be saved: ${errorText(error)}`); return undefined; }
     finally { setOperationBusy(); }
   };
-  // Runs submitReport, then reloads the report and list.
-  const sendReport = async (target: Report, receiptCount: number): Promise<void> => {
-    if (target.id === undefined || busyRef.current) return;
+  const showLoaded = (loaded: { report: Report; receipts: ReceiptInfo[] }): void => {
+    setReport(loaded.report); setBaseline(JSON.stringify(loaded.report)); setReceipts(loaded.receipts); setPendingFiles([]);
+    setSaveUncertain(false);
+  };
+  // Loads the latest report (fresh etag, status and receipt count), submits it, then reloads. Holds busy throughout.
+  const sendReport = async (id: number): Promise<void> => {
+    if (busyRef.current) return;
     setOperationBusy('submitting'); setStatus(''); setOperationError('');
     try {
-      await submitReport(target, { ...props.submission, service: props.service, receiptCount });
-      const loaded = await props.service.loadReport(target.id);
-      setReport(loaded.report); setBaseline(JSON.stringify(loaded.report)); setReceipts(loaded.receipts);
+      const latest = await props.service.loadReport(id);
+      try {
+        await submitReport(latest.report, { ...props.submission, service: props.service, receiptCount: latest.receipts.length });
+      } catch (error) {
+        // submitReport changed the server etag and status; resync best effort, then show the original error.
+        try { showLoaded(await props.service.loadReport(id)); await refreshList(); } catch { /* best effort */ }
+        throw error;
+      }
+      showLoaded(await props.service.loadReport(id));
       setStatus('Report submitted. Accounts will receive it by email.');
       await refreshList();
     } catch (error) { setOperationError(errorText(error)); }
@@ -180,12 +190,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     if (busyRef.current || loading || loadError) return;
     if (!hasEntries(report)) { setStatus(''); setOperationError('Enter at least one expense before submitting.'); return; }
     const saved = await save();
-    if (!saved || saved.id === undefined) return;
-    // State is stale right after save(), so count the receipts from the server.
-    let receiptCount: number;
-    try { receiptCount = (await props.service.loadReport(saved.id)).receipts.length; }
-    catch (error) { setOperationError(errorText(error)); return; }
-    await sendReport(saved, receiptCount);
+    if (saved?.id !== undefined) await sendReport(saved.id);
   };
   const performAction = async (action: PendingAction): Promise<void> => {
     if (busyRef.current) return;
@@ -268,7 +273,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
           <PrimaryButton text="Save" disabled={readOnly || loading || !!loadError || !report.fromDate || !report.toDate} onClick={() => { save().catch(error => setOperationError(errorText(error))); }} />
           {!report.status && <PrimaryButton text="Submit" disabled={readOnly || loading || !!loadError || !report.fromDate || !report.toDate} onClick={() => { submit().catch(error => setOperationError(errorText(error))); }} />}
           {report.status === 'Pending' && <PrimaryButton text="Finish submitting" disabled={locked || loading}
-            onClick={() => { sendReport(report, receipts.length).catch(error => setOperationError(errorText(error))); }} />}
+            onClick={() => { if (report.id !== undefined) sendReport(report.id).catch(error => setOperationError(errorText(error))); }} />}
           <DefaultButton text="New report" disabled={locked} onClick={() => requestAction({ type: 'new' })} />
           <DefaultButton text="Print" disabled={locked} onClick={() => window.print()} />
           {busy && <Spinner size={SpinnerSize.small} label={busy === 'submitting' ? 'Submitting report…' : busy === 'saving' ? 'Saving report and receipts…' : 'Opening report…'} />}
