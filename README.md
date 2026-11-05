@@ -70,7 +70,7 @@ The flow updates the item, which fires the trigger again, but the trigger condit
 
 A second flow, "Expense report email" (made with *Save As* from "Timesheet email" and created turned off), built the same way on the `ExpenseReports` list. Rerun `provisioning/provision-expense-reports.js` first: it adds the same `Status`, `Status Detail`, `Email To`, `Email Subject` and `Email Body` columns. `Status` has no default, so saved reports stay blank until something sets them to `Queued`.
 
-Not wired up yet: the web part does not set `Queued` or fill the email columns on expense reports. When it should (every save or a separate "send" step) is waiting on the client. To test the flow, fill the three email columns on a report by hand and set `Status` to `Queued`.
+The web part's **Submit** button saves the report, fills `Expense Report Template.xlsx`, attaches it, fills the email columns and sets `Status` to `Queued`. A submitted report is read-only. Upload `Templates/xlsx/Expense Report Template.xlsx` to the `Timesheet Templates` library, and turn the "Expense report email" flow on. To resend a failed email, accounts set `Status` back to `Queued`.
 
 The list has item-level security, so the flow's SharePoint connection must be an account in `Payroll Owners` (or a site owner); a Member account only sees its own reports.
 
@@ -94,7 +94,7 @@ The web part writes values into fixed cells (see section 6 of the spec and `src/
 1. Save the new macro-enabled workbook as `Templates/<Type> Timesheet Template (current).xlsm`.
 2. Run `pwsh scripts/Convert-Templates.ps1`. It strips the macros and writes `Templates/xlsx/<Type> Timesheet Template.xlsx`.
 3. Run `npm test`. The definitions test fails if headers or formula cells have moved.
-4. Replace the file in the `Timesheet Templates` library, keeping the same name.
+4. Replace the file in the `Timesheet Templates` library, keeping the same name. The library holds a fourth file, `Expense Report Template.xlsx`, updated the same way.
 
 ## Updating the template logo
 

@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { DefaultButton, Dropdown, IDropdownOption, MessageBar, MessageBarType, PrimaryButton, Spinner, SpinnerSize, ThemeProvider, createTheme } from '@fluentui/react';
 import { IReportService } from '../services/IReportService';
+import { hasEntries } from '../domain/submission';
+import { submitReport } from '../services/submitReport';
 import { ExpenseLine, ExpenseReport as Report, ReceiptInfo, ReportSummary } from '../domain/models';
 import { createReport, validateReport } from '../domain/report';
 import ExpenseTable from './ExpenseTable';
@@ -23,6 +25,7 @@ export interface IExpenseReportProps {
   instanceId: string;
   isDarkTheme?: boolean;
   isPreview?: boolean;
+  submission: { emailTo: string; senderEmail: string; loadTemplate(): Promise<ArrayBuffer> };
 }
 
 type PendingAction = { type: 'new' } | { type: 'open'; id: number };
@@ -43,7 +46,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
   const [saveUncertain, setSaveUncertain] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
-  const [busy, setBusy] = React.useState<'saving' | 'opening' | undefined>();
+  const [busy, setBusy] = React.useState<'saving' | 'opening' | 'submitting' | undefined>();
   const busyRef = React.useRef(false);
   const [loadError, setLoadError] = React.useState('');
   const [listError, setListError] = React.useState('');
@@ -61,7 +64,8 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
   const issues = showValidation ? validateReport(report) : [];
   const dirty = baseline !== JSON.stringify(report) || pendingFiles.length > 0 || saveUncertain;
   const locked = !!busy;
-  const setOperationBusy = (phase?: 'saving' | 'opening'): void => {
+  const readOnly = locked || !!report.status;
+  const setOperationBusy = (phase?: 'saving' | 'opening' | 'submitting'): void => {
     // A synchronous ref also blocks duplicate events before React commits the disabled controls.
     busyRef.current = !!phase;
     setBusy(phase);
@@ -118,10 +122,10 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
     try { setReports(await props.service.listReports(props.userEmail)); setListError(''); }
     catch (error) { setListError(`Saved reports could not be refreshed: ${errorText(error)}`); }
   };
-  const save = async (): Promise<void> => {
-    if (busyRef.current || loading || loadError) return;
+  const save = async (): Promise<Report | undefined> => {
+    if (busyRef.current || loading || loadError) return undefined;
     setShowValidation(true); setStatus(''); setOperationError('');
-    if (validateReport(report).length) { summary.current?.focus(); return; }
+    if (validateReport(report).length) { summary.current?.focus(); return undefined; }
     setOperationBusy('saving');
     try {
       const saved = report.id !== undefined && pendingFiles.length > 0 && JSON.stringify(report) === baseline
@@ -155,8 +159,33 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
       else if (refreshError) setOperationError(`Report saved and receipts uploaded. ${refreshError}`);
       else setStatus('Report saved successfully.');
       await refreshList();
-    } catch (error) { setOperationError(`Report could not be saved: ${errorText(error)}`); }
+      return failed.length || refreshError ? undefined : saved;
+    } catch (error) { setOperationError(`Report could not be saved: ${errorText(error)}`); return undefined; }
     finally { setOperationBusy(); }
+  };
+  // Runs submitReport, then reloads the report and list.
+  const sendReport = async (target: Report, receiptCount: number): Promise<void> => {
+    if (target.id === undefined || busyRef.current) return;
+    setOperationBusy('submitting'); setStatus(''); setOperationError('');
+    try {
+      await submitReport(target, { ...props.submission, service: props.service, receiptCount });
+      const loaded = await props.service.loadReport(target.id);
+      setReport(loaded.report); setBaseline(JSON.stringify(loaded.report)); setReceipts(loaded.receipts);
+      setStatus('Report submitted. Accounts will receive it by email.');
+      await refreshList();
+    } catch (error) { setOperationError(errorText(error)); }
+    finally { setOperationBusy(); }
+  };
+  const submit = async (): Promise<void> => {
+    if (busyRef.current || loading || loadError) return;
+    if (!hasEntries(report)) { setStatus(''); setOperationError('Enter at least one expense before submitting.'); return; }
+    const saved = await save();
+    if (!saved || saved.id === undefined) return;
+    // State is stale right after save(), so count the receipts from the server.
+    let receiptCount: number;
+    try { receiptCount = (await props.service.loadReport(saved.id)).receipts.length; }
+    catch (error) { setOperationError(errorText(error)); return; }
+    await sendReport(saved, receiptCount);
   };
   const performAction = async (action: PendingAction): Promise<void> => {
     if (busyRef.current) return;
@@ -197,7 +226,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
       <div className={styles.reportHeader}>
         <Dropdown id={`${props.instanceId}-instructor`} label="Instructor" className={styles.instructor}
           placeholder="PICK FROM DROPDOWN" selectedKey={report.instructorId || null} options={options}
-          disabled={loading || locked || !employees.length} required errorMessage={issue('instructorId')}
+          disabled={loading || readOnly || !employees.length} required errorMessage={issue('instructorId')}
           onChange={(_, option) => {
             if (busyRef.current || !option || option.disabled) return;
             setReport(current => ({ ...current, instructorId: String(option.key), instructorName: option.text })); setStatus('');
@@ -207,7 +236,7 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
           <h2 id={`${props.instanceId}-pay-period`}>PAY PERIOD</h2>
           <div className={styles.payFields}>
             <PayPeriodPicker id={`${props.instanceId}-pay-period-picker`} periods={periods} error={periodsError || issue('fromDate') || issue('toDate')}
-              from={parseDateInput(report.fromDate) || ''} to={parseDateInput(report.toDate) || ''} disabled={locked}
+              from={parseDateInput(report.fromDate) || ''} to={parseDateInput(report.toDate) || ''} disabled={readOnly}
               onChange={p => { setHeader('fromDate', formatDateInput(p.from)); setHeader('toDate', formatDateInput(p.to)); }} />
           </div>
         </section>
@@ -223,24 +252,31 @@ export default function ExpenseReport(props: IExpenseReportProps): React.ReactEl
           <p>This expense report can&apos;t be saved yet. Please fill in or correct:</p>
           <ul>{issues.map((item, index) => <li key={`${item.field}-${index}`}>{item.message}</li>)}</ul>
         </div>}
+        {report.status === 'Queued' && <MessageBar messageBarType={MessageBarType.info}>Submitted. Sending to accounts.</MessageBar>}
+        {report.status === 'Sent' && <MessageBar messageBarType={MessageBarType.success}>Submitted and emailed to accounts.</MessageBar>}
+        {report.status === 'Email failed' && <MessageBar messageBarType={MessageBarType.warning}>Submitted, but the email to accounts failed. Contact accounts.</MessageBar>}
+        {report.status === 'Pending' && <MessageBar messageBarType={MessageBarType.warning}>Submitting did not finish.</MessageBar>}
         {operationError && <MessageBar messageBarType={MessageBarType.error} isMultiline>{operationError}</MessageBar>}
         {status && <MessageBar messageBarType={MessageBarType.success} role="status">{status}</MessageBar>}
       </div>
-      <ExpenseTable report={report} instanceId={props.instanceId} disabled={locked} issues={issues} onChange={setLine} />
-      <Receipts instanceId={props.instanceId} receipts={receipts} pending={pendingFiles} disabled={locked}
+      <ExpenseTable report={report} instanceId={props.instanceId} disabled={readOnly} issues={issues} onChange={setLine} />
+      <Receipts instanceId={props.instanceId} receipts={receipts} pending={pendingFiles} disabled={readOnly}
         onAdd={files => { if (!busyRef.current) { setPendingFiles(current => [...current, ...files]); setStatus(''); } }}
         onRemove={index => { if (!busyRef.current) setPendingFiles(current => current.filter((_, i) => i !== index)); }} />
       <div className={`${styles.actionArea} ${styles.noPrint}`}>
         <div className={styles.actions}>
-          <PrimaryButton text="Save" disabled={locked || loading || !!loadError || !report.fromDate || !report.toDate} onClick={() => { save().catch(error => setOperationError(errorText(error))); }} />
+          <PrimaryButton text="Save" disabled={readOnly || loading || !!loadError || !report.fromDate || !report.toDate} onClick={() => { save().catch(error => setOperationError(errorText(error))); }} />
+          {!report.status && <PrimaryButton text="Submit" disabled={readOnly || loading || !!loadError || !report.fromDate || !report.toDate} onClick={() => { submit().catch(error => setOperationError(errorText(error))); }} />}
+          {report.status === 'Pending' && <PrimaryButton text="Finish submitting" disabled={locked || loading}
+            onClick={() => { sendReport(report, receipts.length).catch(error => setOperationError(errorText(error))); }} />}
           <DefaultButton text="New report" disabled={locked} onClick={() => requestAction({ type: 'new' })} />
           <DefaultButton text="Print" disabled={locked} onClick={() => window.print()} />
-          {busy && <Spinner size={SpinnerSize.small} label={busy === 'saving' ? 'Saving report and receipts…' : 'Opening report…'} />}
+          {busy && <Spinner size={SpinnerSize.small} label={busy === 'submitting' ? 'Submitting report…' : busy === 'saving' ? 'Saving report and receipts…' : 'Opening report…'} />}
         </div>
         <div className={styles.reopen}>
           <Dropdown id={`${props.instanceId}-saved-reports`} label="Saved reports" placeholder="Choose a report"
             selectedKey={selectedReportId ?? null} disabled={locked || loading || !reports.length}
-            options={reports.map(item => ({ key: item.id, text: `${item.instructorName} · ${item.fromDate} – ${item.toDate} (#${item.id})` }))}
+            options={reports.map(item => ({ key: item.id, text: `${item.instructorName} · ${item.fromDate} – ${item.toDate} (#${item.id}) (${item.status || 'Draft'})` }))}
             onChange={(_, option) => setSelectedReportId(option ? Number(option.key) : undefined)} />
           <DefaultButton text="Reopen" disabled={locked || selectedReportId === undefined || loading} onClick={() => selectedReportId !== undefined && requestAction({ type: 'open', id: selectedReportId })} />
         </div>

@@ -12,6 +12,7 @@ import { SharePointReportService } from '../../expenseReport/services/SharePoint
 import * as strings from 'TimesheetWebPartStrings';
 import TimesheetForm, { ITimesheetFormProps } from './components/TimesheetForm';
 import { EMPLOYEE_LIST, Employee, PAY_PERIOD_LIST, PAY_RATE_LIST, SpEmployeeSource, SpPayPeriodSource, SpPayRateSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
+import { EXPENSE_TEMPLATE_FILE } from '../../excel/fillExpenseReport';
 import { submitTimesheet } from '../../services/submit';
 
 export interface ITimesheetWebPartProps {
@@ -36,7 +37,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
     initializeIcons();
   }
 
-  private renderExpenseReport(): React.ReactElement {
+  private renderExpenseReport(templateLibraryUrl: string): React.ReactElement {
     const siteUrl = (this.properties.expenseSiteUrl || this.context.pageContext.web.absoluteUrl).replace(/\/$/, '');
     const reportsListTitle = this.properties.reportsListTitle || 'ExpenseReports';
     const key = JSON.stringify([siteUrl, reportsListTitle]);
@@ -66,6 +67,11 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
         getEmployees: this.getEmployees,
         userEmail: this.context.pageContext.user.email,
         getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, this.context.pageContext.web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods(),
+        submission: {
+          emailTo: this.properties.emailTo,
+          senderEmail: this.context.pageContext.user.email,
+          loadTemplate: () => new SpTemplateSource(this.context.spHttpClient, this.context.pageContext.web.absoluteUrl, templateLibraryUrl).loadFile(EXPENSE_TEMPLATE_FILE)
+        },
         instanceId: this.instanceId,
         isDarkTheme: this._theme?.isInverted || false
       })
@@ -107,7 +113,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
           employeeId: this.context.pageContext.legacyPageContext.userId,
           senderEmail: this.context.pageContext.user.email
         }),
-      expenseReport: this.renderExpenseReport()
+      expenseReport: this.renderExpenseReport(templateLibraryUrl)
     };
 
     this._root = this._root || createRoot(this.domElement);

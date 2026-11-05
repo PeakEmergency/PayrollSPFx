@@ -97,8 +97,12 @@ export class SpTemplateSource implements TemplateSource {
     private readonly libraryServerRelativeUrl: string
   ) {}
 
-  public async load(type: TimesheetType): Promise<ArrayBuffer> {
-    const filePath = `${this.libraryServerRelativeUrl.replace(/\/$/, '')}/${TEMPLATES[type].fileName}`;
+  public load(type: TimesheetType): Promise<ArrayBuffer> {
+    return this.loadFile(TEMPLATES[type].fileName);
+  }
+
+  public async loadFile(fileName: string): Promise<ArrayBuffer> {
+    const filePath = `${this.libraryServerRelativeUrl.replace(/\/$/, '')}/${fileName}`;
     const res = await check(
       `Loading template ${filePath}`,
       this.client.get(
