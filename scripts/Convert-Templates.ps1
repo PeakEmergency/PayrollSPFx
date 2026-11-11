@@ -38,6 +38,11 @@ foreach ($name in $Names) {
             param($t)
             $t -replace '<Relationship [^>]*relationships/vbaProject"[^>]*/>', ''
         }
+        # Excel 4.0 macro names (xlm="1") also mark the file as macro content.
+        Edit-Entry $zip 'xl/workbook.xml' {
+            param($t)
+            $t -replace '<definedName [^>]*xlm="1"[^>]*>[^<]*</definedName>', ''
+        }
     } finally {
         $zip.Dispose()
     }

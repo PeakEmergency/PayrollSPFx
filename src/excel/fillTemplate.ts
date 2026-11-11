@@ -65,6 +65,16 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
   ws.getCell(def.nameCell).value = data.name;
   if (data.from) ws.getCell(def.fromCell).value = toExcelDate(data.from);
   if (data.to) ws.getCell(def.toCell).value = toExcelDate(data.to);
+  // The template styles these bold italic 14pt with a long date, which shows ######## in the column width.
+  [def.fromCell, def.toCell].forEach((a) => {
+    const cell = ws.getCell(a);
+    cell.font = { ...cell.font, italic: false };
+    cell.numFmt = 'dd/mm/yy;@';
+  });
+  // PSL columns show the level label, far longer than the template's amount column.
+  def.columns.forEach((c) => {
+    if (c.levelTable && c.optionLabels) ws.getColumn(c.col).width = Math.max(...c.optionLabels.map((l) => l.length), c.header.length) + 2;
+  });
 
   data.lines.slice(0, def.rowCount).forEach((line, i) => {
     def.columns.forEach((c) => {
@@ -105,5 +115,21 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
   names.model = names.model.filter((n) => !n.ranges.some((r) => r.indexOf('[') >= 0));
 
   wb.calcProperties.fullCalcOnLoad = true;
-  return (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+  return hideUnusedRows((await wb.xlsx.writeBuffer()) as ArrayBuffer);
+}
+
+/**
+ * The templates hide every row below the form with sheetFormatPr zeroHeight="1".
+ * ExcelJS drops that attribute on write, so put it back in each sheet.
+ */
+export async function hideUnusedRows(xlsx: ArrayBuffer): Promise<ArrayBuffer> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: any = await import(/* webpackChunkName: 'jszip' */ 'jszip/dist/jszip.min.js');
+  const JSZip = mod.default || mod;
+  const zip = await JSZip.loadAsync(new Uint8Array(xlsx));
+  for (const name of Object.keys(zip.files).filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))) {
+    const xml: string = await zip.file(name).async('string');
+    zip.file(name, xml.replace(/<sheetFormatPr(?![^>]*zeroHeight)/, '<sheetFormatPr zeroHeight="1"'));
+  }
+  return zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
 }

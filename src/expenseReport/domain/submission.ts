@@ -1,5 +1,6 @@
 import { calculateReport, formatCurrency } from './calculations';
 import { parseDateInput } from './dates';
+import { ddmmyy } from '../../timesheet/naming';
 import type { ExpenseReport } from './models';
 
 const escapeHtml = (s: string): string =>
@@ -12,8 +13,11 @@ export function hasEntries(report: ExpenseReport): boolean {
   return report.lines.some(line => ENTRY_KEYS.some(key => line[key].trim() !== ''));
 }
 
+// DD-MM-YY: a file name can't hold '/'.
+const fileDate = (raw: string): string => ddmmyy(parseDateInput(raw) || null).replace(/\//g, '-');
+
 export function expenseFileName(report: ExpenseReport, id: number): string {
-  return `Expense Report - ${report.instructorName.trim()} - ${parseDateInput(report.fromDate)}_${parseDateInput(report.toDate)} - ${id}.xlsx`;
+  return `Expense Report - ${report.instructorName.trim()} - ${fileDate(report.fromDate)}_${fileDate(report.toDate)} - ${id}.xlsx`;
 }
 
 export function expenseSubject(report: ExpenseReport): string {

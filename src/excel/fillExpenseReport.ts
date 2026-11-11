@@ -3,7 +3,7 @@ import { parseDateInput } from '../expenseReport/domain/dates';
 import { calculateReport } from '../expenseReport/domain/calculations';
 import type { ExpenseReport } from '../expenseReport/domain/models';
 import { toExcelDate } from '../timesheet/values';
-import { loadExcelJs } from './fillTemplate';
+import { hideUnusedRows, loadExcelJs } from './fillTemplate';
 
 export const EXPENSE_TEMPLATE_FILE = 'Expense Report Template.xlsx';
 
@@ -33,8 +33,8 @@ export async function fillExpenseReport(template: ArrayBuffer, report: ExpenseRe
 
   put('A4', report.instructorName, 'text');
   put('K4', report.fromDate, 'date');
-  put('M4', report.toDate, 'date');
-  ws.getCell('M4').numFmt = 'dd/mm/yy;@'; // the template leaves M4 unformatted
+  put('N4', report.toDate, 'date');
+  ws.getCell('N4').numFmt = 'dd/mm/yy;@'; // the template leaves N4 unformatted
   report.lines.forEach((line, i) => {
     const r = FIRST_ROW + i;
     put(`A${r}`, line.date, 'date');
@@ -64,5 +64,5 @@ export async function fillExpenseReport(template: ArrayBuffer, report: ExpenseRe
   setResult(`N${TOTALS_ROW}`, totals.amount);
 
   wb.calcProperties.fullCalcOnLoad = true;
-  return (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+  return hideUnusedRows((await wb.xlsx.writeBuffer()) as ArrayBuffer);
 }

@@ -73,7 +73,12 @@ it('other templates untouched', async () => {
     const widths = (ws: ExcelJS.Worksheet): (number | string | undefined)[] => ws.columns.map((c) => (c.hidden ? 'hidden' : c.width));
     const expected = widths(original);
     if (type === 'Medic') expected[3] = expected[4] = 'hidden'; // layout hides D:E (start/end)
+    if (type === 'Instructor') expected[4] = 38; // PSL column E widened to fit the level labels
+    if (type === 'Medic') expected[6] = 33; // PSL column G
     expect(widths(filled)).toEqual(expected);
+    const from = filled.getCell(TEMPLATES[type].fromCell);
+    expect(from.numFmt).toBe('dd/mm/yy;@');
+    expect(from.font.italic).toBeFalsy();
   }
 }, 60000); // loads and writes 8 workbooks
 
@@ -136,4 +141,13 @@ it('drops names that point at external workbooks, which Excel rejects once Excel
   await wb.xlsx.load(Buffer.from(await fillTemplate(toArrayBuffer(fixture('Admin')), data)) as unknown as ArrayBuffer);
   const ranges = (wb.definedNames as unknown as { model: { name: string; ranges: string[] }[] }).model;
   expect(ranges.map((n) => n.name)).toEqual(['RequiredFields']);
+});
+
+it('fillTemplate keeps the rows below the form hidden (zeroHeight)', async () => {
+  const data: TimesheetData = { type: 'Instructor', name: 'X', from: '2026-10-01', to: '2026-10-15', lines: [] };
+  const out = Buffer.from(await fillTemplate(toArrayBuffer(fixture('Instructor')), data));
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const JSZip = require('jszip');
+  const xml: string = await (await JSZip.loadAsync(out)).file('xl/worksheets/sheet1.xml').async('string');
+  expect(xml).toMatch(/<sheetFormatPr[^>]*zeroHeight="1"/);
 });

@@ -85,7 +85,7 @@ Differences from the timesheet flow, step by step:
 3. **Get attachments:** as step 2 above, list `ExpenseReports`. A report can have several receipts (and later the filled Excel form), so all of them are sent.
 4. **Apply to each** over `body('Get_attachments')`, containing:
    - *Get attachment content*: Id = `ID` from the trigger, File Identifier = `items('Apply_to_each')?['Id']`
-   - *Append to array variable* `Attachments`, Value (one expression; the classic designer rejects typed JSON mixed with tokens): `addProperty(addProperty(json('{}'), 'Name', items('Apply_to_each')?['DisplayName']), 'ContentBytes', body('Get_attachment_content')?['$content'])`
+   - *Append to array variable* `Attachments`, Value (one expression; the classic designer rejects typed JSON mixed with tokens): `addProperty(addProperty(json('{}'), 'Name', items('Apply_to_each')?['DisplayName']), 'ContentBytes', body('Get_attachment_content'))`. Pass the whole content object, not `?['$content']`: *Send an email (V2)* sends a plain string as the file's raw bytes, so the recipient gets base64 text that Excel reports as corrupt.
 5. **Send:** as step 4 above, but switch the Attachments field to array input (the **T** icon in the classic designer) and set it to `variables('Attachments')`. Check with **Peek code** that `Attachments` is `@variables('Attachments')`.
 6. **Mark sent / Mark failed:** as steps 5 and 6 above, Uri `_api/web/lists/getbytitle('ExpenseReports')/items(@{triggerBody()?['ID']})`. Configure *Mark failed* to run after *Send* has failed, timed out or is skipped.
 

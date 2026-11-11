@@ -290,7 +290,7 @@ describe('submission text', () => {
   })();
 
   it('names the file with ISO dates and the item ID', () => {
-    expect(expenseFileName(r, 7)).toBe('Expense Report - TRINH, ROSIE - 2026-11-05_2026-11-18 - 7.xlsx');
+    expect(expenseFileName(r, 7)).toBe('Expense Report - TRINH, ROSIE - 05-11-26_18-11-26 - 7.xlsx');
     expect(expenseFileName(r, 8)).not.toBe(expenseFileName(r, 7));
   });
   it('builds the subject', () => {

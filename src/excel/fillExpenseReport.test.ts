@@ -36,8 +36,8 @@ it('fills header, rows and cached totals', async () => {
   expect(ws.name).toBe('Expense Report Template');
   expect(ws.getCell('A4').value).toBe('TRINH, ROSIE');
   expect((ws.getCell('K4').value as Date).toISOString().slice(0, 10)).toBe('2026-11-05');
-  expect((ws.getCell('M4').value as Date).toISOString().slice(0, 10)).toBe('2026-11-18');
-  expect(ws.getCell('M4').numFmt).toBe('dd/mm/yy;@');
+  expect((ws.getCell('N4').value as Date).toISOString().slice(0, 10)).toBe('2026-11-18');
+  expect(ws.getCell('N4').numFmt).toBe('dd/mm/yy;@');
   expect((ws.getCell('A8').value as Date).toISOString().slice(0, 10)).toBe('2026-11-05');
   expect(ws.getCell('C8').value).toBe('Burnaby V5H 2A9');
   expect(ws.getCell('D8').value).toBe('Golden V0A 1H1');

@@ -1,7 +1,7 @@
-# Swaps the logo in the three .xlsx templates for src/webparts/timesheet/assets/peak-logo.jpg.
+# Swaps the logo in the four .xlsx templates for src/webparts/timesheet/assets/peak-logo.jpg.
 # Edits the zip directly (no Excel, no ExcelJS). Safe to rerun: keeps the image's top-left and
 # width, drops any crop, and sets the height from the logo's aspect ratio.
-param([string[]]$Types = @('Admin', 'Instructor', 'Medic'))
+param([string[]]$Types = @('Admin', 'Instructor', 'Medic', 'Expense'))
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 Add-Type -AssemblyName System.Drawing
@@ -14,7 +14,7 @@ $img.Dispose()
 $rowEmu = 54.95 * 12700 # header row height; the logo must stay inside it
 
 foreach ($type in $Types) {
-    $file = Join-Path $root "Templates/xlsx/$type Timesheet Template.xlsx"
+    $file = Join-Path $root "Templates/xlsx/$(if ($type -eq 'Expense') { 'Expense Report' } else { "$type Timesheet" }) Template.xlsx"
     $zip = [IO.Compression.ZipFile]::Open($file, 'Update')
     try {
         $media = @($zip.Entries | Where-Object { $_.FullName -like 'xl/media/*' })
