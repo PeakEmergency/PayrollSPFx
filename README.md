@@ -4,7 +4,8 @@ SharePoint Framework web part for Peak Emergency timesheets. The user picks Admi
 
 1. records the submission in the `Timesheet Submissions` list (status `Pending`), with the email's To, Subject and Body ready in hidden columns;
 2. fills a copy of the real template from the `Timesheet Templates` library and attaches it to the list item;
-3. sets the item to `Queued` (or to `Email failed` with the error text if step 2 fails).
+3. copies onto the item every attachment (filled Excel form and receipts) of the person's submitted expense reports for the same pay period, matched on `InstructorKey` and both dates. If the lookup or a copy fails, or the files total over 20 MB, the timesheet goes without them and the submitter sees a warning. An expense report submitted after the timesheet is only sent on its own;
+4. sets the item to `Queued` (or to `Email failed` with the error text if step 2 fails).
 
 Both forms have a **Send a copy to me** Yes/No choice. Yes shows a **Send copy to** box; the address is added to `Email To` (separated by `;`), so the same email also goes to the submitter. It's only used on Submit, never on Save, and it isn't stored with a draft.
 
@@ -58,11 +59,12 @@ The name dropdown on every timesheet and the expense report lists the `Employees
 1. **Trigger:** SharePoint *When an item is created or modified*. Site `https://peakemergency.sharepoint.com`, list `Timesheet Submissions`. In the trigger's **Settings → Trigger conditions** add:
    `@equals(triggerOutputs()?['body/Status/Value'], 'Queued')`
 2. **Get attachments:** SharePoint *Get attachments*, same site and list, Id = `ID` from the trigger.
-3. **Get attachment content:** SharePoint *Get attachment content*, Id = `ID`, File Identifier = expression `first(body('Get_attachments'))?['Id']`.
+3. **Attachments:** a timesheet can carry expense report files too (version 1.0.12.0), so send every attachment. Build steps 3 and 4 like steps 2, 4 and 5 of the expense report flow below: an `Attachments` array variable, an *Apply to each* over `body('Get_attachments')` that gets each file's content and appends `{Name, ContentBytes}` (the whole content object), then:
 4. **Send:** Office 365 Outlook *Send an email (V2)*, using the connection signed in as `schedule@`.
    - To: `Email To`; Subject: `Email Subject`; Body: `Email Body` (all from the trigger)
-   - Attachments Name: expression `first(body('Get_attachments'))?['DisplayName']`; Content: `Attachment Content` from step 3
-   - Set the attachment in the **classic designer** (turn off *New designer*). The new designer silently saves the attachment content as `null`. Check with **⋯ → Peek code** that `ContentBytes` is `@body('Get_attachment_content')`.
+   - Attachments: array input, `variables('Attachments')`
+   - Set the attachment in the **classic designer** (turn off *New designer*). The new designer silently saves the attachment content as `null`. Check with **⋯ → Peek code** that `Attachments` is `@variables('Attachments')`.
+   - Change the flow before deploying 1.0.12.0. The old flow sends only the first attachment, so accounts would get the timesheet without the expense report.
 5. **Mark sent:** SharePoint *Send an HTTP request to SharePoint*. Method `PATCH`, Uri `_api/web/lists/getbytitle('Timesheet Submissions')/items(@{triggerBody()?['ID']})`, Headers `Accept` and `Content-Type` = `application/json;odata=nometadata`, `IF-MATCH` = `*`. Body: `{"Status": "Sent", "StatusDetail": ""}`
 6. **Mark failed:** a second *Send an HTTP request to SharePoint* like step 5, with Body `{"Status": "Email failed", "StatusDetail": "Email flow failed: see the flow run history"}`. Open its **⋯ → Configure run after** and tick *has failed*, *has timed out* and *is skipped* on the step 4 action (skipped means step 2 or 3 failed), and set step 5 to run after step 4 *is successful* only.
 
@@ -87,7 +89,7 @@ Differences from the timesheet flow, step by step:
    - *Get attachment content*: Id = `ID` from the trigger, File Identifier = `items('Apply_to_each')?['Id']`
    - *Append to array variable* `Attachments`, Value (one expression; the classic designer rejects typed JSON mixed with tokens): `addProperty(addProperty(json('{}'), 'Name', items('Apply_to_each')?['DisplayName']), 'ContentBytes', body('Get_attachment_content'))`. Pass the whole content object, not `?['$content']`: *Send an email (V2)* sends a plain string as the file's raw bytes, so the recipient gets base64 text that Excel reports as corrupt.
 5. **Send:** as step 4 above, but switch the Attachments field to array input (the **T** icon in the classic designer) and set it to `variables('Attachments')`. Check with **Peek code** that `Attachments` is `@variables('Attachments')`.
-6. **Mark sent / Mark failed:** as steps 5 and 6 above, Uri `_api/web/lists/getbytitle('ExpenseReports')/items(@{triggerBody()?['ID']})`. Configure *Mark failed* to run after *Send* has failed, timed out or is skipped.
+6. **Mark sent / Mark failed:** as steps 5 and 6 above, Uri `_api/web/GetList('/Lists/ExpenseReports')/items(@{triggerBody()?['ID']})`. Use the list's URL, not its title, so renaming the list doesn't break the flow (the web part finds the list by URL too, from version 1.0.12.0). Configure *Mark failed* to run after *Send* has failed, timed out or is skipped.
 
 A report with no receipts sends with no attachments.
 

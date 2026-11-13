@@ -11,7 +11,7 @@ import { SharePointReportService } from '../../expenseReport/services/SharePoint
 
 import * as strings from 'TimesheetWebPartStrings';
 import TimesheetForm, { ITimesheetFormProps } from './components/TimesheetForm';
-import { EMPLOYEE_LIST, Employee, PAY_PERIOD_LIST, PAY_RATE_LIST, SpEmployeeSource, SpPayPeriodSource, SpPayRateSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
+import { EMPLOYEE_LIST, Employee, PAY_PERIOD_LIST, PAY_RATE_LIST, SpEmployeeSource, SpExpenseSource, SpPayPeriodSource, SpPayRateSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
 import { EXPENSE_TEMPLATE_FILE } from '../../excel/fillExpenseReport';
 import { submitTimesheet } from '../../services/submit';
 
@@ -21,6 +21,7 @@ export interface ITimesheetWebPartProps {
   templateLibraryUrl: string;
   // Expense report settings (blank uses the defaults below).
   expenseSiteUrl: string;
+  /** The list's URL name (<site>/Lists/<name>), not its title, so renaming the list breaks nothing. Kept under its old key for saved pages. */
   reportsListTitle: string;
   defaultRate: string;
 }
@@ -32,6 +33,10 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
   private _expenseKey = '';
   private _theme: ITheme | undefined;
 
+  private get reportsList(): string {
+    return (this.properties.reportsListTitle || 'ExpenseReports').trim();
+  }
+
   protected async onInit(): Promise<void> {
     await super.onInit();
     initializeIcons();
@@ -39,8 +44,8 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
 
   private renderExpenseReport(templateLibraryUrl: string): React.ReactElement {
     const siteUrl = (this.properties.expenseSiteUrl || this.context.pageContext.web.absoluteUrl).replace(/\/$/, '');
-    const reportsListTitle = this.properties.reportsListTitle || 'ExpenseReports';
-    const key = JSON.stringify([siteUrl, reportsListTitle]);
+    const reportsList = this.reportsList;
+    const key = JSON.stringify([siteUrl, reportsList]);
     if (!this._expenseService || this._expenseKey !== key) {
       this._expenseService = new SharePointReportService(
         {
@@ -53,7 +58,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
             return response as unknown as Response;
           }
         },
-        { siteUrl, reportsListTitle }
+        { siteUrl, reportsList }
       );
       this._expenseKey = key;
     }
@@ -111,7 +116,13 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
           templates: new SpTemplateSource(this.context.spHttpClient, web.absoluteUrl, templateLibraryUrl),
           emailTo,
           employeeId: this.context.pageContext.legacyPageContext.userId,
-          senderEmail: this.context.pageContext.user.email
+          senderEmail: this.context.pageContext.user.email,
+          expenses: new SpExpenseSource(
+            this.context.spHttpClient,
+            (this.properties.expenseSiteUrl || web.absoluteUrl).replace(/\/$/, ''),
+            this.reportsList,
+            this.getEmployees
+          )
         }),
       expenseReport: this.renderExpenseReport(templateLibraryUrl)
     };
@@ -150,7 +161,11 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
               groupName: 'Expense report',
               groupFields: [
                 PropertyPaneTextField('expenseSiteUrl', { label: 'SharePoint site URL', placeholder: this.context.pageContext.web.absoluteUrl }),
-                PropertyPaneTextField('reportsListTitle', { label: 'Reports list', placeholder: 'ExpenseReports' }),
+                PropertyPaneTextField('reportsListTitle', {
+                  label: 'Reports list URL name',
+                  description: 'The part after /Lists/ in the list URL. It stays the same when the list is renamed.',
+                  placeholder: 'ExpenseReports'
+                }),
                 PropertyPaneTextField('defaultRate', {
                   label: 'Default mileage rate per km',
                   description: 'New reports only. Saved reports keep their rates.',

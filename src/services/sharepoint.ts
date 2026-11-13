@@ -4,7 +4,7 @@ import { PayPeriod, toPayPeriod } from '../timesheet/payPeriods';
 import { PayRates, rateKey, toPayRates } from '../timesheet/rates';
 import { formatEmployeeName } from '../timesheet/naming';
 import { TimesheetType } from '../timesheet/types';
-import { SubmissionRecord, SubmissionStatus, SubmissionStore, TemplateSource } from './submit';
+import { ExpenseFile, ExpenseSource, SubmissionRecord, SubmissionStatus, SubmissionStore, TemplateSource } from './submit';
 
 export const PAY_PERIOD_LIST = 'Pay Period Schedule';
 export const PAY_RATE_LIST = 'Pay Rates';
@@ -87,6 +87,73 @@ export class SpSubmissionStore implements SubmissionStore {
         body: JSON.stringify({ Status: status, StatusDetail: detail || '' })
       })
     );
+  }
+
+  public async deleteAttachment(id: number, fileName: string): Promise<void> {
+    await check(
+      'Removing an attachment',
+      this.client.post(`${this.itemsUrl}(${id})/AttachmentFiles/getByFileName('${odataString(fileName)}')`, SPHttpClient.configurations.v1, {
+        headers: { ...jsonHeaders, 'X-HTTP-Method': 'DELETE', 'IF-MATCH': '*' }
+      })
+    );
+  }
+
+  public async setEmailBody(id: number, body: string): Promise<void> {
+    await check(
+      'Updating the email body',
+      this.client.post(`${this.itemsUrl}(${id})`, SPHttpClient.configurations.v1, {
+        headers: { ...jsonHeaders, 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+        body: JSON.stringify({ EmailBody: body })
+      })
+    );
+  }
+}
+
+/**
+ * Submitted expense reports in the ExpenseReports list. Matched on InstructorKey, which survives a rename in
+ * the Employees list (InstructorName is a copy taken when the report was saved). Item-level security means
+ * the user only sees reports they created.
+ */
+export class SpExpenseSource implements ExpenseSource {
+  private readonly listUrl: string;
+
+  public constructor(
+    private readonly client: SPHttpClient,
+    private readonly siteUrl: string,
+    /** URL name (<site>/Lists/<name>): it stays the same when the list is renamed. */
+    listUrlName: string,
+    private readonly getEmployees: () => Promise<Employee[]>
+  ) {
+    this.listUrl = `${siteUrl}/_api/web/GetList('${odataString(`${new URL(siteUrl).pathname.replace(/\/$/, '')}/Lists/${listUrlName}`)}')`;
+  }
+
+  public async find(name: string, from: string, to: string): Promise<{ id: number; files: ExpenseFile[] }[]> {
+    const key = (await this.getEmployees()).find((e) => e.name === name)?.key;
+    const who = key ? `InstructorKey eq '${odataString(key)}'` : `InstructorName eq '${odataString(name)}'`;
+    const status = "(Status eq 'Queued' or Status eq 'Sent' or Status eq 'Email failed')";
+    const res = await check(
+      'Loading expense reports',
+      this.client.get(
+        `${this.listUrl}/items?$filter=${who} and ${status}&$select=Id,FromDate,ToDate,AttachmentFiles&$expand=AttachmentFiles&$orderby=Id&$top=5000`,
+        SPHttpClient.configurations.v1,
+        { headers: { Accept: 'application/json;odata=nometadata' } }
+      )
+    );
+    const rows: { Id: number; FromDate: string; ToDate: string; AttachmentFiles: { FileName: string; ServerRelativeUrl: string }[] }[] = (await res.json()).value;
+    return rows
+      .filter((r) => String(r.FromDate).slice(0, 10) === from && String(r.ToDate).slice(0, 10) === to)
+      .map((r) => ({
+        id: r.Id,
+        files: r.AttachmentFiles.map((a) => ({ name: a.FileName, load: () => this.load(a.ServerRelativeUrl) }))
+      }));
+  }
+
+  private async load(serverRelativeUrl: string): Promise<ArrayBuffer> {
+    const res = await check(
+      `Reading ${serverRelativeUrl.split('/').pop()}`,
+      this.client.get(`${this.siteUrl}/_api/web/GetFileByServerRelativePath(decodedurl='${odataString(serverRelativeUrl)}')/$value`, SPHttpClient.configurations.v1)
+    );
+    return res.arrayBuffer();
   }
 }
 

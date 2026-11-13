@@ -88,7 +88,7 @@ class SharePointFixture implements HttpTransport {
   };
 }
 const OWNER = 'a@peak.com';
-const config = { siteUrl: 'https://example.sharepoint.com/sites/expense', reportsListTitle: 'ExpenseReports' };
+const config = { siteUrl: 'https://example.sharepoint.com/sites/expense', reportsList: 'ExpenseReports' };
 
 describe('strict report codec', () => {
   it('preserves 13 slots, IDs, blanks, zero, arbitrary decimal precision and rate snapshots with ISO dates', () => {
@@ -202,7 +202,7 @@ describe('SharePoint storage', () => {
     await expect(service.listReports(OWNER)).rejects.toMatchObject({ kind: 'permission', status: 403 });
     await expect(service.saveReport(report())).rejects.toMatchObject({ kind: 'permission', status: 403 });
     expect(fixture.items).toHaveLength(0);
-    expect(() => new SharePointReportService(fixture, { ...config, reportsListTitle: '' })).toThrow();
+    expect(() => new SharePointReportService(fixture, { ...config, reportsList: '' })).toThrow();
   });
   it('does not follow unsafe or repeated server pagination links', async () => {
     const fixture = new SharePointFixture(); const service = new SharePointReportService(fixture, config);

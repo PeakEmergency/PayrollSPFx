@@ -3,7 +3,8 @@ import { formatDateInput, parseDateInput } from '../domain/dates';
 import { ReportServiceError, type IReportService } from './IReportService';
 import { decodeReport, encodeReport } from './reportCodec';
 export interface HttpTransport { request(url: string, init: RequestInit): Promise<Response>; }
-export interface SharePointReportServiceConfig { siteUrl: string; reportsListTitle: string; }
+/** reportsList: the list's URL name (<site>/Lists/<name>), which stays the same when the list is renamed. */
+export interface SharePointReportServiceConfig { siteUrl: string; reportsList: string; }
 type JsonObject = Record<string, unknown>;
 function invalid(message: string): never { throw new ReportServiceError(message, 'invalidData'); }
 function object(value: unknown): JsonObject {
@@ -53,12 +54,11 @@ export class SharePointReportService implements IReportService {
   public constructor(private readonly transport: HttpTransport, config: SharePointReportServiceConfig) {
     let site: URL;
     try { site = new URL(config.siteUrl); } catch { throw new ReportServiceError('Configure an absolute SharePoint site URL.', 'configuration'); }
-    if (site.protocol !== 'https:' || site.search || site.hash || site.username || site.password || !config.reportsListTitle.trim()) {
-      throw new ReportServiceError('Configure an HTTPS SharePoint site and a nonblank list title.', 'configuration');
+    if (site.protocol !== 'https:' || site.search || site.hash || site.username || site.password || !config.reportsList.trim() || config.reportsList.includes('/')) {
+      throw new ReportServiceError('Configure an HTTPS SharePoint site and a list URL name (no slashes).', 'configuration');
     }
     this.siteUrl = site.href.replace(/\/$/, '');
-    const list = (title: string): string => `${this.siteUrl}/_api/web/lists/getbytitle('${literal(title)}')`;
-    this.reportsUrl = list(config.reportsListTitle);
+    this.reportsUrl = `${this.siteUrl}/_api/web/GetList('${literal(`${site.pathname.replace(/\/$/, '')}/Lists/${config.reportsList.trim()}`)}')`;
   }
   private async request(url: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
