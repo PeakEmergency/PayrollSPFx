@@ -110,7 +110,7 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
     try {
       const result = await submit(data);
       if (result.ok) {
-        setSent(`Timesheet submitted. It will be emailed to ${emailTo}${copyTo ? ` and ${copyTo.trim()}` : ''} within a few minutes.${result.warning ? ` ${result.warning}` : ''}`);
+        setSent(`Timesheet submitted. It will be emailed to ${emailTo}${copyTo ? ` and ${copyTo.trim()}` : ''} within a few minutes.`);
         setTriedSubmit(false);
         setLines([]);
         setFrom('');

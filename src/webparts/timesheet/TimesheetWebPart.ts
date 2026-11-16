@@ -11,7 +11,7 @@ import { SharePointReportService } from '../../expenseReport/services/SharePoint
 
 import * as strings from 'TimesheetWebPartStrings';
 import TimesheetForm, { ITimesheetFormProps } from './components/TimesheetForm';
-import { EMPLOYEE_LIST, Employee, PAY_PERIOD_LIST, PAY_RATE_LIST, SpEmployeeSource, SpExpenseSource, SpPayPeriodSource, SpPayRateSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
+import { EMPLOYEE_LIST, Employee, PAY_PERIOD_LIST, PAY_RATE_LIST, SpEmployeeSource, SpPayPeriodSource, SpPayRateSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
 import { EXPENSE_TEMPLATE_FILE } from '../../excel/fillExpenseReport';
 import { submitTimesheet } from '../../services/submit';
 
@@ -116,13 +116,7 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
           templates: new SpTemplateSource(this.context.spHttpClient, web.absoluteUrl, templateLibraryUrl),
           emailTo,
           employeeId: this.context.pageContext.legacyPageContext.userId,
-          senderEmail: this.context.pageContext.user.email,
-          expenses: new SpExpenseSource(
-            this.context.spHttpClient,
-            (this.properties.expenseSiteUrl || web.absoluteUrl).replace(/\/$/, ''),
-            this.reportsList,
-            this.getEmployees
-          )
+          senderEmail: this.context.pageContext.user.email
         }),
       expenseReport: this.renderExpenseReport(templateLibraryUrl)
     };

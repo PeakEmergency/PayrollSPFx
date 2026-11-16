@@ -5,7 +5,7 @@ import 'jspreadsheet-ce/dist/jspreadsheet.css';
 import { computeLine } from '../../../timesheet/calc';
 import { ColumnDef, Line, TemplateDef } from '../../../timesheet/types';
 import { normalizeDate, parseTime } from '../../../timesheet/values';
-import { fillRate, PayRates, RATE_KEY } from '../../../timesheet/rates';
+import { fillRate, PayRates, RATE_KEY, rateOptions } from '../../../timesheet/rates';
 
 export interface ITimesheetGridProps {
   def: TemplateDef;
@@ -27,7 +27,8 @@ const times: string[] = Array.from({ length: 96 }, (_, i) => `${String(Math.floo
 const formatComputed = (key: string, v: Line[string]): string =>
   typeof v !== 'number' ? '' : key === 'hours' ? v.toFixed(2) : money(v);
 
-function toColumn(c: ColumnDef): jspreadsheet.Column {
+/** allowed: the only option values to offer (the person's PSL levels); undefined offers them all. */
+function toColumn(c: ColumnDef, allowed?: number[]): jspreadsheet.Column {
   // Excel shows a column ~5px wider than width × 7; 90px fits the bold two-line headers.
   const base = { title: c.header, width: Math.max(c.width + 5, 90), align: 'center' as const };
   switch (c.kind) {
@@ -41,10 +42,12 @@ function toColumn(c: ColumnDef): jspreadsheet.Column {
         type: 'dropdown',
         // Labelled rates show the classification; the cell value stays the dollar amount.
         width: c.optionLabels ? 230 : base.width,
-        source: (c.options || []).map((o, i) => ({
-          id: o,
-          name: c.optionLabels ? c.optionLabels[i] : plainNumberKeys.indexOf(c.key) >= 0 ? String(o) : money(o)
-        }))
+        source: (c.options || [])
+          .map((o, i) => ({
+            id: o,
+            name: c.optionLabels ? c.optionLabels[i] : plainNumberKeys.indexOf(c.key) >= 0 ? String(o) : money(o)
+          }))
+          .filter((o) => !allowed || allowed.indexOf(o.id) >= 0)
       };
     case 'time':
       return { ...base, type: 'dropdown', autocomplete: true, source: times };
@@ -130,7 +133,7 @@ export default function TimesheetGrid({ def, lines, rates, onChange }: ITimeshee
       worksheets: [
         {
           data: Array.from({ length: def.rowCount }, (_, i) => toRow(cols, lines[i])),
-          columns: cols.map(toColumn),
+          columns: cols.map((c) => toColumn(c, c.key === RATE_KEY[def.type] ? rateOptions(def.type, rates) : undefined)),
           nestedHeaders: def.groups ? nestedHeaders(def, cols) : undefined,
           minDimensions: [cols.length, def.rowCount],
           defaultRowHeight: 36, // matches the Expense Report rows
@@ -190,8 +193,8 @@ export default function TimesheetGrid({ def, lines, rates, onChange }: ITimeshee
     }
 
     return () => jspreadsheet.destroy(el as jspreadsheet.JspreadsheetInstanceElement, true);
-    // Lines only seed the grid; the parent remounts it (key) to reset.
-  }, [def]);
+    // Lines only seed the grid; the parent remounts it (key) to reset. A new person's rates rebuild the PSL options.
+  }, [def, rates]);
 
   return <div ref={host} />;
 }

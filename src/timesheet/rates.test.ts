@@ -1,4 +1,4 @@
-import { courseType, fillRate, hasRate, PayRates, rateKey, refillRates, toPayRates } from './rates';
+import { courseType, fillRate, hasRate, PayRates, rateKey, rateOptions, refillRates, toPayRates } from './rates';
 import { formatEmployeeName } from './naming';
 import { Line } from './types';
 
@@ -67,5 +67,15 @@ describe('picking another employee', () => {
     const lines: Line[] = [{ date: '2026-11-02', hours: 8, rate: 24 }, {}];
     expect(refillRates('Admin', lines, emma)).toEqual([{ date: '2026-11-02', hours: 8, rate: 30 }, { rate: null }]);
     expect(refillRates('Admin', lines, undefined)[0].rate).toBeNull();
+  });
+});
+
+describe('rateOptions', () => {
+  it("Instructor: only the person's course rate amounts", () => expect(rateOptions('Instructor', ben)).toEqual([150, 225]));
+  it('Medic: only the amount of their Medic PSL', () => expect(rateOptions('Medic', ben)).toEqual([250]));
+  it('no rates, or Admin: no filter', () => {
+    expect(rateOptions('Instructor', undefined)).toBeUndefined();
+    expect(rateOptions('Instructor', emma)).toBeUndefined();
+    expect(rateOptions('Admin', emma)).toBeUndefined();
   });
 });

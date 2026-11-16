@@ -64,6 +64,20 @@ function rateFor(type: TimesheetType, line: Line, rates: PayRates): number | und
   return t ? rates.course[t] : undefined;
 }
 
+/**
+ * The PSL dropdown amounts this person may pick: their Medic PSL, or the amounts of their course rates.
+ * Undefined (show every level) for Admin, which has no PSL dropdown, and while there is no rate to go on.
+ */
+export function rateOptions(type: TimesheetType, rates: PayRates | undefined): number[] | undefined {
+  if (!rates || type === 'Admin') return undefined;
+  const col = TEMPLATES[type].columns.filter((c) => c.key === RATE_KEY[type])[0];
+  const mine = type === 'Medic'
+    ? [rates.medicPSL === undefined ? undefined : medicAmount(rates.medicPSL)]
+    : COURSE_TYPES.map((t) => rates.course[t]);
+  const allowed = (col.options || []).filter((o) => mine.indexOf(o) >= 0);
+  return allowed.length ? allowed : undefined;
+}
+
 const blank = (v: unknown): boolean => v === null || v === undefined || String(v).trim() === '';
 
 /**
