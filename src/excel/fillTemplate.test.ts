@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ExcelJS from 'exceljs';
-import { fillTemplate } from './fillTemplate';
+import { fillTemplate, mapRows } from './fillTemplate';
 import { TEMPLATES } from '../timesheet/definitions';
 import { Line, TimesheetData, TimesheetType } from '../timesheet/types';
 
@@ -75,6 +75,7 @@ it('other templates untouched', async () => {
     if (type === 'Medic') expected[3] = expected[4] = 'hidden'; // layout hides D:E (start/end)
     if (type === 'Instructor') expected[4] = 38; // PSL column E widened to fit the level labels
     if (type === 'Medic') expected[6] = 33; // PSL column G
+    if (type === 'Admin') expected[9] = 8; // STAT shown in the template's hidden helper column J
     expect(widths(filled)).toEqual(expected);
     const from = filled.getCell(TEMPLATES[type].fromCell);
     expect(from.numFmt).toBe('dd/mm/yy;@');
@@ -150,4 +151,43 @@ it('fillTemplate keeps the rows below the form hidden (zeroHeight)', async () =>
   const JSZip = require('jszip');
   const xml: string = await (await JSZip.loadAsync(out)).file('xl/worksheets/sheet1.xml').async('string');
   expect(xml).toMatch(/<sheetFormatPr[^>]*zeroHeight="1"/);
+});
+
+it('mapRows moves row numbers but leaves function names alone', () => {
+  expect(mapRows('SUM(F7:F22)+LOG10(A22)+$E$23', (r) => (r >= 22 ? r + 3 : r))).toBe('SUM(F7:F25)+LOG10(A25)+$E$26');
+});
+
+it('more lines than the template inserts rows above the totals and keeps every formula', async () => {
+  const rows: Line[] = Array.from({ length: 20 }, (_, i) => ({ date: '2026-10-15', start: '09:00', end: '10:00', rate: 20 + i }));
+  const ws = await fill('Admin', rows);
+  // 16 template rows (7–22) + 4: data runs 7–26, the hidden spare row and totals move down 4.
+  expect(ws.getCell('G26').value).toBe(39);
+  expect(ws.getCell('F24').formula).toBe('((D24-C24)*24-E24)');
+  expect(ws.getCell('F26').formula).toBe('((D26-C26)*24-E26)');
+  expect(ws.getCell('A29').value).toBe('TOTALS');
+  expect(ws.getCell('F29').formula).toBe('SUM(F7:F26)');
+  expect(ws.getCell('E29').formula).toBe('SUM(E7:E27)');
+  expect((ws.getCell('I29').value as { result?: number }).result).toBe(20 * 20 + 190);
+  expect(ws.getRow(27).hidden).toBe(true);
+  expect(ws.getRow(24).hidden).toBe(false);
+  expect(ws.getRow(24).height).toBe(ws.getRow(8).height);
+  const dv = (ws as unknown as { dataValidations: { model: Record<string, unknown> } }).dataValidations.model;
+  expect(dv.E24).toEqual(dv.E8);
+
+  const medic = await fill('Medic', Array.from({ length: 15 }, () => line));
+  expect(medic.getCell('K22').formula).toBe('SUM(I22:J22)');
+  expect(medic.getCell('J24').formula).toBe('SUM(J8:J22)');
+  expect(medic.getCell('L24').formula).toBe('SUM(L8:L22)');
+  expect(medic.getCell('H21').formula).toBe('IF(G21="",0,F21*VLOOKUP(G21,$M$6:$N$9,2,FALSE))');
+});
+
+it('admin STAT column shows Yes/No and fills a Yes row orange', async () => {
+  const ws = await fill('Admin', [{ date: '2026-10-15', start: '09:00', end: '10:00', rate: 20, stat: 'Yes' }, { date: '2026-10-16', stat: 'No' }]);
+  expect(ws.getColumn('J').hidden).toBe(false);
+  expect(ws.getCell('J6').value).toBe('STAT');
+  expect(ws.getCell('J7').value).toBe('Yes');
+  expect(ws.getCell('J8').value).toBe('No');
+  const orange = (a: string): unknown => (ws.getCell(a).fill as { fgColor?: { argb?: string } }).fgColor?.argb;
+  ['A7', 'B7', 'G7', 'J7'].forEach((a) => expect(orange(a)).toBe('FFFFC000'));
+  expect(orange('A8')).not.toBe('FFFFC000');
 });

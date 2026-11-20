@@ -13,7 +13,7 @@ import * as strings from 'TimesheetWebPartStrings';
 import TimesheetForm, { ITimesheetFormProps } from './components/TimesheetForm';
 import { EMPLOYEE_LIST, Employee, PAY_PERIOD_LIST, PAY_RATE_LIST, SpEmployeeSource, SpPayPeriodSource, SpPayRateSource, SpSubmissionStore, SpTemplateSource } from '../../services/sharepoint';
 import { EXPENSE_TEMPLATE_FILE } from '../../excel/fillExpenseReport';
-import { submitTimesheet } from '../../services/submit';
+import { saveDraft, submitTimesheet } from '../../services/submit';
 
 export interface ITimesheetWebPartProps {
   emailTo: string;
@@ -105,19 +105,25 @@ export default class TimesheetWebPart extends BaseClientSideWebPart<ITimesheetWe
     const { emailTo, listTitle } = this.properties;
     const templateLibraryUrl = this.properties.templateLibraryUrl || `${web.serverRelativeUrl.replace(/\/$/, '')}/Timesheet Templates`;
 
+    const userId: number = this.context.pageContext.legacyPageContext.userId;
+    const store = (): SpSubmissionStore => new SpSubmissionStore(this.context.spHttpClient, web.absoluteUrl, listTitle);
+
     const props: ITimesheetFormProps = {
       emailTo,
       getEmployees: this.getEmployees,
       getPayPeriods: () => new SpPayPeriodSource(this.context.spHttpClient, web.absoluteUrl, PAY_PERIOD_LIST).getPayPeriods(),
       getPayRates: () => new SpPayRateSource(this.context.spHttpClient, web.absoluteUrl, PAY_RATE_LIST).getAllRates(),
-      submit: async (data) =>
+      submit: async (data, draftId) =>
         submitTimesheet(data, {
-          store: new SpSubmissionStore(this.context.spHttpClient, web.absoluteUrl, listTitle),
+          store: store(),
           templates: new SpTemplateSource(this.context.spHttpClient, web.absoluteUrl, templateLibraryUrl),
           emailTo,
-          employeeId: this.context.pageContext.legacyPageContext.userId,
-          senderEmail: this.context.pageContext.user.email
+          employeeId: userId,
+          senderEmail: this.context.pageContext.user.email,
+          draftId
         }),
+      saveDraft: (data, draftId) => saveDraft(data, { store: store(), employeeId: userId, draftId }),
+      listDrafts: () => store().listDrafts(userId),
       expenseReport: this.renderExpenseReport(templateLibraryUrl)
     };
 

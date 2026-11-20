@@ -53,6 +53,8 @@ function toColumn(c: ColumnDef, allowed?: number[]): jspreadsheet.Column {
       return { ...base, type: 'dropdown', autocomplete: true, source: times };
     case 'computed':
       return { ...base, type: 'text', readOnly: true };
+    case 'yesno':
+      return { ...base, width: Math.max(c.width + 5, 70), type: 'dropdown', source: ['Yes', 'No'] };
     default:
       return { ...base, type: 'text', align: c.kind === 'upper' ? 'left' : 'center' };
   }
@@ -62,6 +64,8 @@ function toColumn(c: ColumnDef, allowed?: number[]): jspreadsheet.Column {
  * Columns on screen. The template's sub-total columns are ~1 char wide, so they are
  * left off screen like in Excel; they are still computed and written to the file.
  */
+const STAT_ORANGE = '#ffc000';
+
 const shownColumns = (def: TemplateDef): ColumnDef[] => def.columns.filter((c) => !(c.kind === 'computed' && c.width < 14));
 
 const groupOf = (def: TemplateDef, c: ColumnDef): NonNullable<TemplateDef['groups']>[number] | undefined =>
@@ -124,6 +128,12 @@ export default function TimesheetGrid({ def, lines, rates, onChange }: ITimeshee
         });
       });
       updating = false;
+      // Stat holiday rows are orange, as payroll marks them in Excel.
+      const yesno = cols.filter((c) => c.kind === 'yesno');
+      next.forEach((line, y) => {
+        const on = yesno.some((c) => line[c.key] === 'Yes');
+        el.querySelectorAll<HTMLElement>(`tbody td[data-y="${y}"]`).forEach((td) => (td.style.backgroundColor = on ? STAT_ORANGE : ''));
+      });
       onChangeRef.current(next);
     };
 
@@ -132,13 +142,14 @@ export default function TimesheetGrid({ def, lines, rates, onChange }: ITimeshee
       toolbar: false,
       worksheets: [
         {
-          data: Array.from({ length: def.rowCount }, (_, i) => toRow(cols, lines[i])),
+          data: Array.from({ length: Math.max(def.rowCount, lines.length) }, (_, i) => toRow(cols, lines[i])),
           columns: cols.map((c) => toColumn(c, c.key === RATE_KEY[def.type] ? rateOptions(def.type, rates) : undefined)),
           nestedHeaders: def.groups ? nestedHeaders(def, cols) : undefined,
           minDimensions: [cols.length, def.rowCount],
           defaultRowHeight: 36, // matches the Expense Report rows
-          allowInsertRow: false,
-          allowManualInsertRow: false,
+          // Enter on the last row adds a row (Tab at the end of the last row too, below); the file grows to match.
+          allowInsertRow: true,
+          allowManualInsertRow: true,
           allowDeleteRow: false,
           allowInsertColumn: false,
           allowDeleteColumn: false,
@@ -171,10 +182,25 @@ export default function TimesheetGrid({ def, lines, rates, onChange }: ITimeshee
           }
         }
         sync(instance);
-      }
+      },
+      oninsertrow: (instance) => sync(instance)
     });
     ws.hideIndex(); // the template has no row numbers
     sync(ws);
+
+    // Tab at the end of a row goes to the start of the next one, adding a row after the last.
+    const onKeyDown = (e: KeyboardEvent): void => {
+      const sel = ws.selectedCell;
+      if (e.key !== 'Tab' || e.shiftKey || !sel || jspreadsheet.current !== ws) return;
+      const [x, y] = [Number(sel[0]), Number(sel[1])];
+      if (x !== cols.length - 1) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (ws.edition) ws.closeEditor(ws.edition[0], true);
+      if (y === ws.options.data!.length - 1) ws.insertRow();
+      ws.updateSelectionFromCoords(0, y + 1, 0, y + 1);
+    };
+    document.addEventListener('keydown', onKeyDown, true);
 
     // Template fills: group colour on the group heading and its column titles, grey elsewhere.
     const headRows = el.querySelectorAll('thead tr');
@@ -192,7 +218,10 @@ export default function TimesheetGrid({ def, lines, rates, onChange }: ITimeshee
       });
     }
 
-    return () => jspreadsheet.destroy(el as jspreadsheet.JspreadsheetInstanceElement, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      jspreadsheet.destroy(el as jspreadsheet.JspreadsheetInstanceElement, true);
+    };
     // Lines only seed the grid; the parent remounts it (key) to reset. A new person's rates rebuild the PSL options.
   }, [def, rates]);
 

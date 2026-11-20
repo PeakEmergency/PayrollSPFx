@@ -68,6 +68,14 @@ The name dropdown on every timesheet and the expense report lists the `Employees
 
 The flow updates the item, which fires the trigger again, but the trigger condition skips anything not `Queued`.
 
+### Saved timesheets
+
+**Save for later** stores the timesheet as an item with Status `Draft` (the whole form, in Line Items). The person reopens it from **Saved timesheets** at the top of the form; submitting it turns that same item into the submission. The flow ignores drafts because of the `Queued` trigger condition. On an existing site, rerun `provisioning/provision-timesheets.js` once to add the `Draft` status choice.
+
+### More rows and Stat holidays
+
+Pressing Enter on the last row, or Tab at the end of the last row, adds a row on every timesheet. When more rows are filled than the template has, the emailed file gets extra rows inserted above the totals, so it stays one timesheet. The Admin timesheet has a **STAT** Yes/No column (the template's hidden column J); a Yes row is orange on screen and in the emailed file.
+
 ### Expense report email flow
 
 A second flow, "Expense report email" (made with *Save As* from "Timesheet email" and created turned off), built the same way on the `ExpenseReports` list. Rerun `provisioning/provision-expense-reports.js` first: it adds the same `Status`, `Status Detail`, `Email To`, `Email Subject` and `Email Body` columns. `Status` has no default, so saved reports stay blank until something sets them to `Queued`.
@@ -102,4 +110,4 @@ The web part writes values into fixed cells (see section 6 of the spec and `src/
 
 ## Updating the template logo
 
-Run `powershell -File scripts/Update-TemplateLogo.ps1`. It puts `src/webparts/timesheet/assets/peak-logo.jpg` into the three `Templates/xlsx` files, uncropped, at the logo's aspect ratio. After updating, re-upload the three files in `Templates/xlsx` to the Timesheet Templates library.
+Run `powershell -File scripts/Update-TemplateLogo.ps1`. It puts `src/webparts/timesheet/assets/peak-logo.jpg` into the four `Templates/xlsx` files, uncropped, at the logo's aspect ratio. After updating, re-upload the four files in `Templates/xlsx` to the Timesheet Templates library.

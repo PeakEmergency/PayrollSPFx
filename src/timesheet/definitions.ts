@@ -28,7 +28,9 @@ export const TEMPLATES: Record<TimesheetType, TemplateDef> = {
       col('deductions', 'E', 'DEDUCTIONS', 'dropdown', 15.71, [0, 0.5, 1, 1.25, 1.5, 1.75, 2]),
       col('hours', 'F', 'TOTAL\nHOURS', 'computed', 10.14),
       col('rate', 'G', 'PAY\nRATE', 'number', 14.14),
-      col('amount', 'I', 'AMOUNT', 'computed', 15)
+      col('amount', 'I', 'AMOUNT', 'computed', 15),
+      // Stat holiday. J is a hidden helper column in the template; fillTemplate shows it.
+      col('stat', 'J', 'STAT', 'yesno', 8)
     ],
     totals: [
       { key: 'deductions', cell: 'E25' },

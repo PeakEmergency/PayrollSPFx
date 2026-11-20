@@ -155,3 +155,9 @@ $border: #b2b2b2;
 
   ul { margin: 8px 0 0; padding-left: 22px; }
 }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

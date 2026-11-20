@@ -7,7 +7,8 @@ import { computeTotals } from '../../../timesheet/calc';
 import { TEMPLATES } from '../../../timesheet/definitions';
 import { Line, TimesheetData, TimesheetType } from '../../../timesheet/types';
 import { validate } from '../../../timesheet/validate';
-import { SubmitResult } from '../../../services/submit';
+import { Draft, SubmitResult } from '../../../services/submit';
+import { ddmmyy } from '../../../timesheet/naming';
 import { PayPeriod } from '../../../timesheet/payPeriods';
 import PayPeriodPicker from './PayPeriodPicker';
 import SendCopy from './SendCopy';
@@ -20,7 +21,11 @@ export interface ITimesheetFormProps {
   getPayPeriods(): Promise<PayPeriod[]>;
   /** Every Pay Rates row, keyed by rateKey(name). */
   getPayRates(): Promise<Record<string, PayRates>>;
-  submit(data: TimesheetData): Promise<SubmitResult>;
+  /** draftId: the saved timesheet being finished, which becomes the submission. */
+  submit(data: TimesheetData, draftId?: number): Promise<SubmitResult>;
+  /** Saves to finish later; returns the draft's id (draftId when resaving). */
+  saveDraft(data: TimesheetData, draftId?: number): Promise<number>;
+  listDrafts(): Promise<Draft[]>;
   /** Shown in place of the timesheet when the Expense Report button is picked. */
   expenseReport: React.ReactNode;
 }
@@ -33,7 +38,10 @@ const plainTotals: string[] = ['days', 'adminHours', 'deductions', 'hours'];
 const hasEntries = (lines: Line[]): boolean =>
   lines.some((l) => Object.keys(l).some((k) => l[k] !== null && l[k] !== undefined && l[k] !== ''));
 
-export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, getPayRates, submit, expenseReport }: ITimesheetFormProps): React.ReactElement {
+const draftLabel = (d: Draft): string =>
+  `${d.data.type} – ${d.data.name || 'no name'}${d.data.from ? ` – ${ddmmyy(d.data.from)}` : ''} (saved ${new Date(d.modified).toLocaleDateString('en-CA')})`;
+
+export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, getPayRates, submit, saveDraft, listDrafts, expenseReport }: ITimesheetFormProps): React.ReactElement {
   const [type, setType] = React.useState<TimesheetType | undefined>();
   // Both forms stay mounted once opened (just hidden), so switching never loses entries.
   const [showExpense, setShowExpense] = React.useState(false);
@@ -54,6 +62,15 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
   const [submitting, setSubmitting] = React.useState(false);
   const [copyTo, setCopyTo] = React.useState<string | undefined>();
   const [triedSubmit, setTriedSubmit] = React.useState(false);
+  const [drafts, setDrafts] = React.useState<Draft[]>([]);
+  const [draftId, setDraftId] = React.useState<number | undefined>();
+  const [pendingDraft, setPendingDraft] = React.useState<Draft | undefined>();
+  const [saving, setSaving] = React.useState(false);
+
+  const refreshDrafts = (): void => {
+    listDrafts().then(setDrafts, (err: Error) => setErrors([`Saved timesheets couldn't be loaded: ${err.message}`]));
+  };
+  React.useEffect(refreshDrafts, []);
 
   React.useEffect(() => {
     getEmployees().then(setEmployees, (err: Error) => setErrors([`Employees couldn't be loaded: ${err.message}`]));
@@ -82,6 +99,7 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
   const switchTo = (t: TimesheetType): void => {
     setType(t);
     setPendingType(undefined);
+    setDraftId(undefined);
     setLines([]);
     setErrors([]);
     setSent('');
@@ -93,6 +111,44 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
     if (t === type) return;
     if (hasEntries(lines)) setPendingType(t);
     else switchTo(t);
+  };
+
+  const openDraft = (d: Draft): void => {
+    setPendingDraft(undefined);
+    setPendingType(undefined);
+    setShowExpense(false);
+    setType(d.data.type);
+    setName(d.data.name);
+    setFrom(d.data.from || '');
+    setTo(d.data.to || '');
+    setLines(d.data.lines);
+    setCopyTo(d.data.copyTo);
+    setDraftId(d.id);
+    setErrors([]);
+    setSent('');
+    setTriedSubmit(false);
+    setGridKey((k) => k + 1);
+  };
+
+  const pickDraft = (d: Draft): void => {
+    if (d.id !== draftId && hasEntries(lines)) setPendingDraft(d);
+    else openDraft(d);
+  };
+
+  const onSave = async (): Promise<void> => {
+    if (!type) return;
+    setSent('');
+    setSaving(true);
+    try {
+      setDraftId(await saveDraft({ type, name, from: from || null, to: to || null, lines, copyTo }, draftId));
+      setErrors([]);
+      setSent('Saved. To finish it later, pick it from Saved timesheets.');
+      refreshDrafts();
+    } catch (err) {
+      setErrors([`Couldn't save: ${err instanceof Error ? err.message : String(err)}`]);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const onSubmit = async (): Promise<void> => {
@@ -108,8 +164,10 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
     setErrors([]);
     setSubmitting(true);
     try {
-      const result = await submit(data);
+      const result = await submit(data, draftId);
       if (result.ok) {
+        setDraftId(undefined);
+        refreshDrafts();
         setSent(`Timesheet submitted. It will be emailed to ${emailTo}${copyTo ? ` and ${copyTo.trim()}` : ''} within a few minutes.`);
         setTriedSubmit(false);
         setLines([]);
@@ -147,7 +205,23 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
         {types.map((t) => (
           <DefaultButton key={t} text={t} toggle checked={t === type && !showExpense} onClick={() => pick(t)} />
         ))}
+        {drafts.length > 0 && (
+          <Dropdown
+            ariaLabel="Saved timesheets"
+            placeholder="Saved timesheets"
+            selectedKey={showExpense ? null : draftId ?? null}
+            options={drafts.map((d) => ({ key: d.id, text: draftLabel(d) }))}
+            onChange={(_, o) => o && pickDraft(drafts.find((d) => d.id === o.key)!)}
+          />
+        )}
       </div>
+      {pendingDraft && (
+        <div className={styles.confirm} role="alertdialog" aria-live="assertive">
+          Opening the saved timesheet replaces the rows you entered.
+          <PrimaryButton text="Open" onClick={() => openDraft(pendingDraft)} />
+          <DefaultButton text="Cancel" onClick={() => setPendingDraft(undefined)} />
+        </div>
+      )}
 
       <div hidden={showExpense}>
       {pendingType && (
@@ -207,7 +281,10 @@ export default function TimesheetForm({ emailTo, getEmployees, getPayPeriods, ge
 
           <SendCopy id="send-copy" value={copyTo} showError={triedSubmit} disabled={submitting} onChange={setCopyTo} />
           {rateProblem && <MessageBar messageBarType={MessageBarType.error}>{rateProblem}</MessageBar>}
-          <PrimaryButton text={submitting ? 'Sending…' : 'Submit'} disabled={submitting || !name || !from || !to || !ratesLoaded || !!rateProblem} onClick={onSubmit} />
+          <div className={styles.actions}>
+            <PrimaryButton text={submitting ? 'Sending…' : 'Submit'} disabled={submitting || saving || !name || !from || !to || !ratesLoaded || !!rateProblem} onClick={onSubmit} />
+            <DefaultButton text={saving ? 'Saving…' : 'Save for later'} disabled={submitting || saving} onClick={onSave} />
+          </div>
         </>
       )}
 

@@ -1,7 +1,8 @@
 /* eslint-disable @rushstack/no-new-null -- null marks a blank cell; lines are stored as JSON */
 export type TimesheetType = 'Admin' | 'Instructor' | 'Medic';
 
-export type ColumnKind = 'date' | 'time' | 'upper' | 'number' | 'dropdown' | 'computed';
+/** yesno: 'Yes' / 'No' text; a 'Yes' row is filled orange (Admin Stat holiday). */
+export type ColumnKind = 'date' | 'time' | 'upper' | 'number' | 'dropdown' | 'computed' | 'yesno';
 
 export interface ColumnDef {
   key: string;
@@ -25,6 +26,7 @@ export interface TemplateDef {
   fromCell: string;
   toCell: string;
   firstRow: number;
+  /** Rows in the template. The grid and the filled file grow past this when more lines are entered. */
   rowCount: number;
   headerRow: number;
   columns: ColumnDef[];

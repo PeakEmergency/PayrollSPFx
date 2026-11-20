@@ -48,7 +48,7 @@ await (async () => {
     ['PayPeriodEnd', '<Field Type="DateTime" Name="PayPeriodEnd" StaticName="PayPeriodEnd" DisplayName="Pay Period End" Format="DateOnly" />'],
     ['TotalAmount', '<Field Type="Currency" Name="TotalAmount" StaticName="TotalAmount" DisplayName="Total Amount" LCID="1033" Decimals="2" />'],
     ['LineItems', '<Field Type="Note" Name="LineItems" StaticName="LineItems" DisplayName="Line Items" RichText="FALSE" NumLines="6" />'],
-    ['Status', '<Field Type="Choice" Name="Status" StaticName="Status" DisplayName="Status"><Default>Pending</Default><CHOICES><CHOICE>Pending</CHOICE><CHOICE>Queued</CHOICE><CHOICE>Sent</CHOICE><CHOICE>Email failed</CHOICE></CHOICES></Field>'],
+    ['Status', '<Field Type="Choice" Name="Status" StaticName="Status" DisplayName="Status"><Default>Pending</Default><CHOICES><CHOICE>Draft</CHOICE><CHOICE>Pending</CHOICE><CHOICE>Queued</CHOICE><CHOICE>Sent</CHOICE><CHOICE>Email failed</CHOICE></CHOICES></Field>'],
     ['StatusDetail', '<Field Type="Note" Name="StatusDetail" StaticName="StatusDetail" DisplayName="Status Detail" RichText="FALSE" NumLines="3" />'],
     // Read by the Power Automate flow that sends the email.
     ['EmailTo', '<Field Type="Text" Name="EmailTo" StaticName="EmailTo" DisplayName="Email To" />'],
@@ -72,9 +72,9 @@ await (async () => {
   await sp(`${list}/fields/getbyinternalnameortitle('Status')`, {
     method: 'POST',
     headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-    body: { __metadata: { type: 'SP.FieldChoice' }, Choices: { __metadata: { type: 'Collection(Edm.String)' }, results: ['Pending', 'Queued', 'Sent', 'Email failed'] } }
+    body: { __metadata: { type: 'SP.FieldChoice' }, Choices: { __metadata: { type: 'Collection(Edm.String)' }, results: ['Draft', 'Pending', 'Queued', 'Sent', 'Email failed'] } }
   });
-  console.log('Status choices: Pending, Queued, Sent, Email failed');
+  console.log('Status choices: Draft, Pending, Queued, Sent, Email failed');
 
   // --- Item-level security: users read and edit only their own items ---
   await sp(list, {

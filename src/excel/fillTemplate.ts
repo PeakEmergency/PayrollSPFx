@@ -14,6 +14,78 @@ export async function loadExcelJs(): Promise<typeof ExcelJSType> {
   return mod.default || mod;
 }
 
+/** Cell references (A22, $E$23) not followed by '(' or '!'; sheet-qualified refs are not in these formulas. */
+const CELL_REF = /(?<![A-Za-z_])(\$?[A-Z]{1,3})(\$?)(\d+)(?![\d(!])/g;
+
+/** Rewrites each row number in a formula or range with map. Absolute rows ($5) map too. */
+export const mapRows = (formula: string, map: (row: number) => number): string =>
+  formula.replace(CELL_REF, (_m, c: string, abs: string, r: string) => `${c}${abs}${map(Number(r))}`);
+
+type Validations = Record<string, unknown>;
+const validationsOf = (ws: ExcelJSType.Worksheet): Validations =>
+  (ws as unknown as { dataValidations: { model: Validations } }).dataValidations.model;
+
+/**
+ * Inserts extra rows above the last template row, so the totals' SUM ranges stretch over them.
+ * ExcelJS moves values and styles but not formulas, validations, formats or hidden flags; those are fixed here.
+ * Returns the definition with the larger row count and the moved totals cells.
+ */
+export function growRows(ws: ExcelJSType.Worksheet, def: TemplateDef, extra: number): TemplateDef {
+  if (extra <= 0) return def;
+  const at = def.firstRow + def.rowCount - 1;
+  const src = at - 1;
+  const shift = (r: number): number => (r >= at ? r + extra : r);
+
+  // Plain formulas first: a shared formula would be translated again after the move.
+  ws.eachRow((row) => row.eachCell((cell) => {
+    if (cell.formula) cell.value = { formula: cell.formula } as ExcelJSType.CellFormulaValue;
+  }));
+  const hidden: boolean[] = [];
+  for (let r = at; r <= ws.rowCount; r++) hidden[r] = ws.getRow(r).hidden;
+
+  ws.duplicateRow(src, extra, true);
+
+  for (let r = ws.rowCount; r >= at + extra; r--) {
+    const row = ws.getRow(r);
+    row.hidden = !!hidden[r - extra];
+    row.eachCell((cell) => {
+      if (cell.formula) cell.value = { formula: mapRows(cell.formula, shift) } as ExcelJSType.CellFormulaValue;
+    });
+  }
+  for (let r = at; r < at + extra; r++) {
+    const row = ws.getRow(r);
+    row.hidden = false;
+    row.eachCell((cell) => {
+      if (cell.formula) cell.value = { formula: mapRows(cell.formula, (x) => (x === src ? r : x)) } as ExcelJSType.CellFormulaValue;
+    });
+  }
+
+  const validations = validationsOf(ws);
+  const moved: Validations = {};
+  Object.keys(validations).forEach((k) => {
+    moved[mapRows(k, shift)] = validations[k];
+    const m = /^([A-Z]+)(\d+)$/.exec(k);
+    if (m && Number(m[2]) === src) for (let r = at; r < at + extra; r++) moved[`${m[1]}${r}`] = validations[k];
+    delete validations[k];
+  });
+  Object.assign(validations, moved);
+
+  // Missing from the typings.
+  const formats = (ws as unknown as { conditionalFormattings: { ref: string; rules: { formulae?: string[] }[] }[] }).conditionalFormattings;
+  formats.forEach((cf) => {
+    cf.ref = mapRows(cf.ref, shift);
+    cf.rules.forEach((rule) => {
+      if (rule.formulae) rule.formulae = rule.formulae.map((x) => mapRows(String(x), shift));
+    });
+  });
+
+  return {
+    ...def,
+    rowCount: def.rowCount + extra,
+    totals: def.totals.map((t) => ({ ...t, cell: mapRows(t.cell, shift) }))
+  };
+}
+
 /** Writes the column headings from the definitions into the template header row, keeping cell styles. */
 export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
   def.columns.forEach((c) => {
@@ -30,11 +102,27 @@ export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
     for (let r = def.firstRow; r < def.firstRow + def.rowCount; r++) {
       ws.getCell(`F${r}`).value = null;
     }
-    ws.getCell('K20').value = { formula: 'SUM(I20:J20)' } as ExcelJSType.CellFormulaValue;
-    ws.getCell('J22').value = { formula: 'SUM(J8:J20)' } as ExcelJSType.CellFormulaValue;
+    // The template's last row has no K formula, and its per diem total sums J:K.
+    const last = def.firstRow + def.rowCount - 1;
+    ws.getCell(`K${last}`).value = { formula: `SUM(I${last}:J${last})` } as ExcelJSType.CellFormulaValue;
+    ws.getCell(def.totals.find((t) => t.key === 'perDiem')!.cell).value = { formula: `SUM(J${def.firstRow}:J${last})` } as ExcelJSType.CellFormulaValue;
   }
+  const validations = validationsOf(ws);
+  // Yes/No columns (Admin STAT) go in a hidden helper column of the template: show it and style it like the rate column.
+  def.columns.filter((c) => c.kind === 'yesno').forEach((c) => {
+    const like = def.columns.find((x) => x.kind === 'number')!.col;
+    const column = ws.getColumn(c.col);
+    column.hidden = false;
+    column.width = c.width / 7;
+    ws.getCell(`${c.col}${def.headerRow}`).style = ws.getCell(`${like}${def.headerRow}`).style;
+    for (let r = def.firstRow; r < def.firstRow + def.rowCount; r++) {
+      const cell = ws.getCell(`${c.col}${r}`);
+      cell.value = null;
+      cell.style = { ...ws.getCell(`${like}${r}`).style, numFmt: 'General', alignment: { horizontal: 'center', vertical: 'middle' } };
+      validations[cell.address] = { type: 'list', allowBlank: true, formulae: ['"Yes,No"'] };
+    }
+  });
   // PSL cells hold the level text; a hidden table maps it back to the amount, and the line total looks it up.
-  const validations = (ws as unknown as { dataValidations: { model: Record<string, unknown> } }).dataValidations.model;
   def.columns.forEach((c) => {
     const t = c.levelTable;
     if (!t) return;
@@ -53,13 +141,17 @@ export function applyLayout(ws: ExcelJSType.Worksheet, def: TemplateDef): void {
   });
 }
 
+const STAT_ORANGE = 'FFFFC000';
+
 /** Fills a copy of the stored template. Only cell values change; styles and formats stay. */
 export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): Promise<ArrayBuffer> {
   const ExcelJS = await loadExcelJs();
-  const def = TEMPLATES[data.type];
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(template);
-  const ws = wb.getWorksheet(def.sheetName)!;
+  const ws = wb.getWorksheet(TEMPLATES[data.type].sheetName)!;
+  // Rows up to the last one with anything in it; blank rows added at the end don't grow the file.
+  const used = data.lines.reduce((n, l, i) => (Object.keys(l).some((k) => l[k] !== null && l[k] !== '') ? i + 1 : n), 0);
+  const def = growRows(ws, TEMPLATES[data.type], used - TEMPLATES[data.type].rowCount);
   applyLayout(ws, def);
 
   ws.getCell(def.nameCell).value = data.name;
@@ -89,6 +181,17 @@ export async function fillTemplate(template: ArrayBuffer, data: TimesheetData): 
         if (t) cell.value = timeToDayFraction(t);
       } else if (c.kind === 'upper') {
         cell.value = String(raw).toUpperCase();
+      } else if (c.kind === 'yesno') {
+        cell.value = String(raw);
+        // Payroll marks stat holiday rows orange.
+        if (raw === 'Yes') {
+          const row = ws.getRow(def.firstRow + i);
+          for (let x = 1; x <= ws.getColumn(c.col).number; x++) {
+            // A new style object: ExcelJS shares one between cells, so setting .fill would colour other rows too.
+            const cell = row.getCell(x);
+            cell.style = { ...cell.style, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: STAT_ORANGE } } };
+          }
+        }
       } else {
         const n = Number(raw);
         const at = c.levelTable ? (c.options || []).indexOf(n) : -1;

@@ -6,15 +6,19 @@ import { TimesheetData, TimesheetType } from '../timesheet/types';
 import { validate } from '../timesheet/validate';
 import { recipients } from './copyTo';
 
-export type SubmissionStatus = 'Pending' | 'Queued' | 'Sent' | 'Email failed';
+/** Draft: saved to finish later; the email flow only acts on Queued. */
+export type SubmissionStatus = 'Draft' | 'Pending' | 'Queued' | 'Sent' | 'Email failed';
 
 /** List item. emailTo/emailSubject/emailBody are read by the Power Automate flow that sends the email. */
 export interface SubmissionRecord {
   title: string;
   type: TimesheetType;
   employeeId: number;
-  from: string;
-  to: string;
+  /** null only on a draft. */
+  // eslint-disable-next-line @rushstack/no-new-null
+  from: string | null;
+  // eslint-disable-next-line @rushstack/no-new-null
+  to: string | null;
   totalAmount: number;
   lineItemsJson: string;
   emailTo: string;
@@ -23,8 +27,17 @@ export interface SubmissionRecord {
   emailBody: string;
 }
 
+/** A saved, unsubmitted timesheet. */
+export interface Draft {
+  id: number;
+  modified: string;
+  data: TimesheetData;
+}
+
 export interface SubmissionStore {
-  create(r: SubmissionRecord): Promise<number>;
+  create(r: SubmissionRecord, status: SubmissionStatus): Promise<number>;
+  /** Overwrites an existing item (a draft) with r and status. */
+  update(id: number, r: SubmissionRecord, status: SubmissionStatus): Promise<void>;
   attach(id: number, fileName: string, content: ArrayBuffer): Promise<void>;
   setStatus(id: number, status: SubmissionStatus, detail?: string): Promise<void>;
 }
@@ -40,6 +53,8 @@ export interface SubmitDeps {
   employeeId: number;
   /** Signed-in user's email, named in the body: the flow sends from the shared schedule mailbox. */
   senderEmail: string;
+  /** The draft being finished: submitting turns that item into the submission. */
+  draftId?: number;
 }
 
 export type SubmitResult = { ok: true } | { ok: false; errors: string[] };
@@ -70,7 +85,7 @@ export async function submitTimesheet(data: TimesheetData, deps: SubmitDeps): Pr
   const def = TEMPLATES[data.type];
   const total = computeTotals(data.type, data.lines)[def.grandTotalKey];
   const fileName = buildFileName(data);
-  const id = await deps.store.create({
+  const record: SubmissionRecord = {
     title: fileName,
     type: data.type,
     employeeId: deps.employeeId,
@@ -81,7 +96,13 @@ export async function submitTimesheet(data: TimesheetData, deps: SubmitDeps): Pr
     emailTo: recipients(deps.emailTo, data.copyTo),
     emailSubject: buildSubject(data),
     emailBody: buildBody(data, deps.senderEmail, total)
-  });
+  };
+  let id: number;
+  if (deps.draftId === undefined) id = await deps.store.create(record, 'Pending');
+  else {
+    id = deps.draftId;
+    await deps.store.update(id, record, 'Pending');
+  }
 
   try {
     const content = await fillTemplate(await deps.templates.load(data.type), data);
@@ -97,4 +118,26 @@ export async function submitTimesheet(data: TimesheetData, deps: SubmitDeps): Pr
     }
     return { ok: false, errors: [`Your timesheet was saved but could not be queued for email: ${message}`] };
   }
+}
+
+/**
+ * Saves the timesheet as it stands, valid or not, to finish later. The whole TimesheetData goes in
+ * LineItems so it reopens exactly; submitting replaces it with the computed lines. Returns the item id.
+ */
+export async function saveDraft(data: TimesheetData, deps: Pick<SubmitDeps, 'store' | 'employeeId' | 'draftId'>): Promise<number> {
+  const record: SubmissionRecord = {
+    title: `Draft - ${data.type} Timesheet - ${data.name || 'no name'}`,
+    type: data.type,
+    employeeId: deps.employeeId,
+    from: data.from,
+    to: data.to,
+    totalAmount: computeTotals(data.type, data.lines)[TEMPLATES[data.type].grandTotalKey],
+    lineItemsJson: JSON.stringify(data),
+    emailTo: '',
+    emailSubject: '',
+    emailBody: ''
+  };
+  if (deps.draftId === undefined) return deps.store.create(record, 'Draft');
+  await deps.store.update(deps.draftId, record, 'Draft');
+  return deps.draftId;
 }

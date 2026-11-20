@@ -4,7 +4,7 @@ import { PayPeriod, toPayPeriod } from '../timesheet/payPeriods';
 import { PayRates, rateKey, toPayRates } from '../timesheet/rates';
 import { formatEmployeeName } from '../timesheet/naming';
 import { TimesheetType } from '../timesheet/types';
-import { SubmissionRecord, SubmissionStatus, SubmissionStore, TemplateSource } from './submit';
+import { Draft, SubmissionRecord, SubmissionStatus, SubmissionStore, TemplateSource } from './submit';
 
 export const PAY_PERIOD_LIST = 'Pay Period Schedule';
 export const PAY_RATE_LIST = 'Pay Rates';
@@ -38,7 +38,23 @@ async function check(step: string, request: Promise<SPHttpClientResponse>): Prom
 }
 
 // Noon UTC keeps a date-only field on the same calendar day in any North American time zone.
-const dateOnly = (iso: string): string => `${iso}T12:00:00Z`;
+// eslint-disable-next-line @rushstack/no-new-null -- a draft may have no pay period yet
+const dateOnly = (iso: string | null): string | null => (iso ? `${iso}T12:00:00Z` : null);
+
+const fields = (r: SubmissionRecord, status: SubmissionStatus): Record<string, unknown> => ({
+  Title: r.title,
+  TimesheetType: r.type,
+  EmployeeId: r.employeeId,
+  PayPeriodStart: dateOnly(r.from),
+  PayPeriodEnd: dateOnly(r.to),
+  TotalAmount: r.totalAmount,
+  LineItems: r.lineItemsJson,
+  EmailTo: r.emailTo,
+  EmailSubject: r.emailSubject,
+  EmailBody: r.emailBody,
+  Status: status,
+  StatusDetail: ''
+});
 
 export class SpSubmissionStore implements SubmissionStore {
   private readonly itemsUrl: string;
@@ -47,27 +63,39 @@ export class SpSubmissionStore implements SubmissionStore {
     this.itemsUrl = `${webUrl}/_api/web/lists/getbytitle('${odataString(listTitle)}')/items`;
   }
 
-  public async create(r: SubmissionRecord): Promise<number> {
+  public async create(r: SubmissionRecord, status: SubmissionStatus): Promise<number> {
     const res = await check(
       'Saving the list item',
-      this.client.post(this.itemsUrl, SPHttpClient.configurations.v1, {
-        headers: jsonHeaders,
-        body: JSON.stringify({
-          Title: r.title,
-          TimesheetType: r.type,
-          EmployeeId: r.employeeId,
-          PayPeriodStart: dateOnly(r.from),
-          PayPeriodEnd: dateOnly(r.to),
-          TotalAmount: r.totalAmount,
-          LineItems: r.lineItemsJson,
-          EmailTo: r.emailTo,
-          EmailSubject: r.emailSubject,
-          EmailBody: r.emailBody,
-          Status: 'Pending'
-        })
-      })
+      this.client.post(this.itemsUrl, SPHttpClient.configurations.v1, { headers: jsonHeaders, body: JSON.stringify(fields(r, status)) })
     );
     return (await res.json()).Id;
+  }
+
+  public async update(id: number, r: SubmissionRecord, status: SubmissionStatus): Promise<void> {
+    await check(
+      'Saving the list item',
+      this.client.post(`${this.itemsUrl}(${id})`, SPHttpClient.configurations.v1, {
+        headers: { ...jsonHeaders, 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+        body: JSON.stringify(fields(r, status))
+      })
+    );
+  }
+
+  /** The user's own drafts, newest first. */
+  public async listDrafts(userId: number): Promise<Draft[]> {
+    const res = await check(
+      'Loading saved timesheets',
+      this.client.get(
+        `${this.itemsUrl}?$select=Id,Modified,LineItems&$filter=Status eq 'Draft' and AuthorId eq ${userId}&$orderby=Modified desc&$top=100`,
+        SPHttpClient.configurations.v1,
+        { headers: { Accept: 'application/json;odata=nometadata' } }
+      )
+    );
+    return (await res.json()).value.map((row: { Id: number; Modified: string; LineItems: string }) => ({
+      id: row.Id,
+      modified: row.Modified,
+      data: JSON.parse(row.LineItems)
+    }));
   }
 
   public async attach(id: number, fileName: string, content: ArrayBuffer): Promise<void> {

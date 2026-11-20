@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { SubmissionRecord, SubmissionStatus, SubmitDeps, submitTimesheet } from './submit';
+import { saveDraft, SubmissionRecord, SubmissionStatus, SubmitDeps, submitTimesheet } from './submit';
 import { TimesheetData, TimesheetType } from '../timesheet/types';
 
 const medicFixture = fs.readFileSync(path.resolve(__dirname, '../../Templates/xlsx/Medic Timesheet Template.xlsx'));
@@ -27,7 +27,8 @@ function fakes(opts: { attachError?: Error; loadError?: Error } = {}): Fakes {
     employeeId: 7,
     senderEmail: 'carolyn@peakemergency.com',
     store: {
-      create: async (r) => { f.calls.push('create'); f.created.push(r); return 42; },
+      create: async (r, status) => { f.calls.push(`create(${status})`); f.created.push(r); return 42; },
+      update: async (id, r, status) => { f.calls.push(`update(${id},${status})`); f.created.push(r); },
       attach: async () => { f.calls.push('attach'); if (opts.attachError) throw opts.attachError; },
       setStatus: async (id, status, detail) => { f.calls.push(`setStatus(${status})`); f.statuses.push([id, status, detail]); }
     },
@@ -46,7 +47,7 @@ it('happy path queues the item for the email flow', async () => {
   const f = fakes();
   expect(await submitTimesheet(data, f.deps)).toEqual({ ok: true });
   // Queued only after the file is attached: the flow triggers on Status = Queued.
-  expect(f.calls).toEqual(['create', 'load', 'attach', 'setStatus(Queued)']);
+  expect(f.calls).toEqual(['create(Pending)', 'load', 'attach', 'setStatus(Queued)']);
   expect(f.created[0]).toMatchObject({
     title: 'Medic Timesheet - NIKODYM, CAROLYN - 2026-10-01_2026-10-15.xlsx',
     totalAmount: 597,
@@ -118,4 +119,21 @@ it('refuses a bad copy address before creating anything', async () => {
   const result = await submitTimesheet({ ...data, copyTo: 'nope' }, f.deps);
   expect(result.ok).toBe(false);
   expect(f.calls).toEqual([]);
+});
+
+it('saving a draft keeps the whole timesheet, even unfinished, and resaves the same item', async () => {
+  const f = fakes();
+  const unfinished: TimesheetData = { ...data, from: null, name: '' };
+  expect(await saveDraft(unfinished, f.deps)).toBe(42);
+  expect(await saveDraft(unfinished, { ...f.deps, draftId: 42 })).toBe(42);
+  expect(f.calls).toEqual(['create(Draft)', 'update(42,Draft)']);
+  expect(JSON.parse(f.created[0].lineItemsJson)).toEqual(unfinished);
+  expect(f.created[0].from).toBeNull();
+});
+
+it('submitting a draft turns that item into the submission', async () => {
+  const f = fakes();
+  expect(await submitTimesheet(data, { ...f.deps, draftId: 9 })).toEqual({ ok: true });
+  expect(f.calls).toEqual(['update(9,Pending)', 'load', 'attach', 'setStatus(Queued)']);
+  expect(f.statuses[0][0]).toBe(9);
 });
